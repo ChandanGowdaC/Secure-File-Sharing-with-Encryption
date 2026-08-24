@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - blob_data:/app/storage/blobs
+    environment:
+      - DATABASE_URL=sqlite:///./secure_file_sharing.db
+      - CORS_ORIGINS=["http://localhost:5173"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - ./crypto:/crypto
+    depends_on:
+      - backend
+
+volumes:
+  blob_data:

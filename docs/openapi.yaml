@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: Secure File Sharing with Encryption
+  version: 0.1.0
+  description: REST API contract for team integration (FastAPI implements this spec).
+
+servers:
+  - url: http://localhost:8000/api/v1
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: F.1 Register user
+      operationId: register
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: F.2 Login
+      operationId: login
+  /auth/mfa/verify:
+    post:
+      tags: [auth]
+      summary: F.3 MFA verification
+      operationId: verifyMfa
+  /auth/users/public-key:
+    get:
+      tags: [auth]
+      summary: F.4 Public key directory lookup
+      operationId: lookupPublicKey
+  /transfers/upload:
+    post:
+      tags: [transfers]
+      summary: F.9 Queue encrypted transfer
+      operationId: uploadTransfer
+  /transfers/pending:
+    get:
+      tags: [transfers]
+      summary: F.10 Pending transfers for receiver
+      operationId: listPending
+  /transfers/{transfer_id}/deliver:
+    post:
+      tags: [transfers]
+      summary: F.11 Deliver and purge blob
+      operationId: deliverTransfer
+  /transfers/received:
+    get:
+      tags: [transfers]
+      summary: F.12/F.13 Received transfers
+      operationId: listReceived
+  /transfers/{transfer_id}/download-ack:
+    post:
+      tags: [transfers]
+      summary: F.13/F.14 Download acknowledgement
+      operationId: acknowledgeDownload
+  /admin/logs:
+    get:
+      tags: [admin]
+      summary: F.15 Admin transfer log
+      operationId: viewTransferLogs
