@@ -16,6 +16,7 @@ class UploadTransferRequest(BaseModel):
     nonce: str = Field(..., description="Base64-encoded AES-GCM nonce")
     auth_tag: str = Field(..., description="Base64-encoded AES-GCM authentication tag")
     sender_ephemeral_public_key: str = Field(..., description="Base64-encoded ephemeral DH public key")
+    original_filename: Optional[str] = None
 
 
 class UploadTransferResponse(BaseModel):
@@ -42,6 +43,7 @@ class DeliverTransferResponse(BaseModel):
     auth_tag: str
     sender_ephemeral_public_key: str
     sender: str
+    original_filename: Optional[str] = None
 
 
 class ReceivedTransferItem(BaseModel):
@@ -52,6 +54,8 @@ class ReceivedTransferItem(BaseModel):
     nonce: Optional[str] = None
     auth_tag: Optional[str] = None
     sender_ephemeral_public_key: Optional[str] = None
+    original_filename: Optional[str] = None
+
 
 
 class ReceivedTransfersResponse(BaseModel):

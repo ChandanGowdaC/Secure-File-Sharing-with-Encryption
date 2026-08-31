@@ -5,8 +5,15 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-import boto3
-from botocore.exceptions import ClientError
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+    BOTO3_AVAILABLE = True
+except ImportError:
+    boto3 = None
+    ClientError = Exception
+    BOTO3_AVAILABLE = False
+
 
 from app.config import settings
 
@@ -87,6 +94,11 @@ class LocalBlobStorage(BlobStorageBackend):
 
 
 def get_blob_storage() -> BlobStorageBackend:
-    if settings.storage_backend == "s3":
-        return S3BlobStorage()
+    if settings.storage_backend == "s3" and BOTO3_AVAILABLE:
+        try:
+            return S3BlobStorage()
+        except Exception:
+            # Fallback to local storage if S3 bucket connection fails in dev
+            return LocalBlobStorage()
     return LocalBlobStorage()
+

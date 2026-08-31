@@ -13,6 +13,8 @@ class RegisterRequest(BaseModel):
 class RegisterResponse(BaseModel):
     message: str
     username: str
+    mfa_provisioning_uri: Optional[str] = None
+
 
 
 class LoginRequest(BaseModel):
@@ -22,6 +24,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     mfa_required: bool
+    mfa_challenge_token: Optional[str] = None
     session_token: Optional[str] = None
     message: str
 
@@ -29,6 +32,8 @@ class LoginResponse(BaseModel):
 class MfaVerifyRequest(BaseModel):
     username_or_email: str
     code: str = Field(..., min_length=6, max_length=6)
+    mfa_challenge_token: Optional[str] = None
+
 
 
 class PublicKeyLookupResponse(BaseModel):
