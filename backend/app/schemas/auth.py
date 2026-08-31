@@ -27,6 +27,9 @@ class LoginResponse(BaseModel):
     mfa_challenge_token: Optional[str] = None
     session_token: Optional[str] = None
     message: str
+    is_admin: bool = False
+    masked_email: Optional[str] = None
+    username: Optional[str] = None
 
 
 class MfaVerifyRequest(BaseModel):

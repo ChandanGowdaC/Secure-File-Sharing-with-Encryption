@@ -37,6 +37,21 @@ def get_totp_uri(secret: str, username: str) -> str:
     return totp.provisioning_uri(name=username, issuer_name=settings.app_name)
 
 
+import secrets
+import hashlib
+import hmac
+
+
+def generate_email_otp() -> str:
+    """Generate secure 6-digit numeric OTP for email 2FA."""
+    return f"{secrets.randbelow(1000000):06d}"
+
+
+def hash_otp(otp: str) -> str:
+    """Generate SHA256 HMAC for storing OTP in challenge token."""
+    return hmac.new(settings.secret_key.encode(), otp.encode(), hashlib.sha256).hexdigest()
+
+
 def create_token(data: Dict[str, Any], expires_delta: timedelta) -> str:
     payload = data.copy()
     payload["exp"] = datetime.now(timezone.utc) + expires_delta
@@ -50,11 +65,27 @@ def create_session_token(user_id: int, username: str, is_admin: bool = False) ->
     )
 
 
-def create_mfa_challenge_token(user_id: int, username: str) -> str:
+def create_mfa_challenge_token(user_id: int, username: str, otp: Optional[str] = None) -> str:
+    token_data: Dict[str, Any] = {
+        "sub": str(user_id),
+        "username": username,
+        "type": "mfa_challenge",
+    }
+    if otp:
+        token_data["otp_hash"] = hash_otp(otp)
+
     return create_token(
-        {"sub": str(user_id), "username": username, "type": "mfa_challenge"},
+        token_data,
         timedelta(minutes=settings.mfa_challenge_expire_minutes),
     )
+
+
+def verify_email_otp(submitted_code: str, token_payload: Dict[str, Any]) -> bool:
+    expected_hash = token_payload.get("otp_hash")
+    if not expected_hash:
+        return False
+    submitted_hash = hash_otp(submitted_code)
+    return hmac.compare_digest(expected_hash, submitted_hash)
 
 
 def decode_token(token: str) -> Optional[Dict[str, Any]]:

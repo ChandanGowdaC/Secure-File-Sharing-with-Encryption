@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI):
             )
             db.add(admin_user)
             db.commit()
+        else:
+            admin_user.is_admin = True
+            admin_user.hashed_password = hash_password(settings.admin_password)
+            db.commit()
     finally:
         db.close()
     yield

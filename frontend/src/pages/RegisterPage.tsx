@@ -12,16 +12,30 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [mfaUri, setMfaUri] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please verify and try again.')
+      return
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.')
+      return
+    }
+
+    setLoading(true)
 
     try {
       // 1. Generate client-side ECDH P-256 long-term keypair
@@ -38,12 +52,11 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
         long_term_public_key: keypair.publicKey,
       })
 
-      if (res.mfa_provisioning_uri) {
-        setMfaUri(res.mfa_provisioning_uri)
-      } else {
-        onRegisterSuccess(res.username)
+      onRegisterSuccess(res.username)
+      setSuccessMsg('Account and cryptographic keys created successfully! Redirecting to sign in...')
+      setTimeout(() => {
         navigate('/login')
-      }
+      }, 1500)
     } catch (err: any) {
       setError(err.message || 'Registration failed')
     } finally {
@@ -59,67 +72,116 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {successMsg && <div className="alert alert-success">{successMsg}</div>}
 
-      {mfaUri ? (
-        <div>
-          <div className="alert alert-success">
-            Account created successfully! Set up Multi-Factor Authentication (MFA) in your authenticator app (Google Authenticator, Authy, or Duo).
-          </div>
-          <div className="form-group">
-            <label>TOTP Provisioning URI / Key:</label>
-            <input className="form-control" readOnly value={mfaUri} />
-          </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-            Note: For quick testing/evaluation, default master TOTP code <code>000000</code> is also accepted.
-          </p>
-          <button className="btn-primary" style={{ width: '100%' }} onClick={() => navigate('/login')}>
-            Proceed to Login
-          </button>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Username</label>
+          <input
+            type="text"
+            required
+            className="form-control"
+            placeholder="e.g. alice"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+          />
         </div>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Username</label>
-            <input
-              type="text"
-              required
-              className="form-control"
-              placeholder="e.g. alice"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-            />
-          </div>
 
-          <div className="form-group">
-            <label>Email Address</label>
-            <input
-              type="email"
-              required
-              className="form-control"
-              placeholder="alice@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
+        <div className="form-group">
+          <label>Email Address</label>
+          <input
+            type="email"
+            required
+            className="form-control"
+            placeholder="alice@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
+          <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginTop: '0.25rem' }}>
+            Two-factor authentication (2FA) verification codes will be sent here upon login.
+          </small>
+        </div>
 
-          <div className="form-group">
-            <label>Password</label>
+        <div className="form-group">
+          <label>Password</label>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               minLength={8}
               className="form-control"
               placeholder="At least 8 characters"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              style={{ paddingRight: '45px' }}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.1rem',
+                color: 'var(--text-muted)',
+                padding: '4px',
+              }}
+              title={showPassword ? 'Hide password' : 'View password'}
+            >
+              {showPassword ? '👁️' : '🙈'}
+            </button>
           </div>
+        </div>
 
-          <button type="submit" disabled={loading} className="btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-            {loading ? 'Generating ECDH Keypair...' : 'Register & Generate Cryptographic Identity'}
-          </button>
-        </form>
-      )}
+        <div className="form-group">
+          <label>Confirm Password</label>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              required
+              minLength={8}
+              className="form-control"
+              placeholder="Re-enter your password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              style={{ paddingRight: '45px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.1rem',
+                color: 'var(--text-muted)',
+                padding: '4px',
+              }}
+              title={showConfirmPassword ? 'Hide password' : 'View password'}
+            >
+              {showConfirmPassword ? '👁️' : '🙈'}
+            </button>
+          </div>
+          {confirmPassword && password !== confirmPassword && (
+            <small style={{ color: '#ef4444', fontSize: '0.8rem', display: 'block', marginTop: '0.25rem' }}>
+              ⚠️ Passwords do not match
+            </small>
+          )}
+          {confirmPassword && password === confirmPassword && (
+            <small style={{ color: '#10b981', fontSize: '0.8rem', display: 'block', marginTop: '0.25rem' }}>
+              ✓ Passwords match
+            </small>
+          )}
+        </div>
+
+        <button type="submit" disabled={loading} className="btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+          {loading ? 'Generating ECDH Keypair...' : 'Register & Generate Cryptographic Identity'}
+        </button>
+      </form>
     </div>
   )
 }

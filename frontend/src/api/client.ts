@@ -53,8 +53,8 @@ export const api = {
   },
   auth: {
     register: (body: unknown) => request<{ message: string; username: string; mfa_provisioning_uri?: string }>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-    login: (body: unknown) => request<{ mfa_required: boolean; mfa_challenge_token?: string; session_token?: string; message: string }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-    verifyMfa: (body: unknown) => request<{ mfa_required: boolean; session_token?: string; message: string }>('/auth/mfa/verify', { method: 'POST', body: JSON.stringify(body) }),
+    login: (body: unknown) => request<{ mfa_required: boolean; mfa_challenge_token?: string; session_token?: string; message: string; is_admin?: boolean; masked_email?: string; username?: string }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+    verifyMfa: (body: unknown) => request<{ mfa_required: boolean; session_token?: string; message: string; is_admin?: boolean; username?: string }>('/auth/mfa/verify', { method: 'POST', body: JSON.stringify(body) }),
     lookupPublicKey: (params: { username?: string; email?: string }) => {
       const query = new URLSearchParams()
       if (params.username) query.set('username', params.username)

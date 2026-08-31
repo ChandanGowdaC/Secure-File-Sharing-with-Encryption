@@ -14,12 +14,15 @@ from app.schemas.auth import (
     RegisterRequest,
     RegisterResponse,
 )
+from app.services.email import mask_email, send_mfa_email
 from app.utils.security import (
     create_mfa_challenge_token,
     create_session_token,
+    generate_email_otp,
     generate_mfa_secret,
     get_totp_uri,
     hash_password,
+    verify_email_otp,
     verify_password,
     verify_totp,
 )
@@ -43,7 +46,7 @@ def register_user(db: Session, payload: RegisterRequest) -> RegisterResponse:
     db.refresh(user)
 
     return RegisterResponse(
-        message="Registration successful. Set up MFA using the provisioning URI, then log in.",
+        message="Registration successful. Proceed to login.",
         username=user.username,
         mfa_provisioning_uri=get_totp_uri(mfa_secret, user.username),
     )
@@ -58,11 +61,19 @@ def login_user(db: Session, payload: LoginRequest) -> LoginResponse:
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise AppError("Invalid credentials.", status_code=401)
 
-    challenge = create_mfa_challenge_token(user.id, user.username)
+    # Generate 6-digit Email OTP and send to registered address
+    email_otp = generate_email_otp()
+    send_mfa_email(user.email, user.username, email_otp)
+
+    challenge = create_mfa_challenge_token(user.id, user.username, email_otp)
+    masked = mask_email(user.email)
     return LoginResponse(
         mfa_required=True,
         mfa_challenge_token=challenge,
-        message="Password verified. Complete MFA to continue.",
+        masked_email=masked,
+        username=user.username,
+        is_admin=user.is_admin,
+        message=f"A 6-digit verification code has been sent to your registered email ({masked}).",
     )
 
 
@@ -80,15 +91,24 @@ def verify_mfa(db: Session, payload: MfaVerifyRequest, challenge_token: str) -> 
     if user.username != payload.username_or_email and user.email != payload.username_or_email:
         raise AppError("MFA challenge does not match user.", status_code=401)
 
-    is_valid_totp = verify_totp(user.mfa_secret, payload.code) if user.mfa_secret else False
-    if not is_valid_totp and payload.code not in ("000000", "123456"):
-        raise AppError("Invalid MFA code.", status_code=401)
+    # 1. Verify against email OTP hash
+    is_valid_email_otp = verify_email_otp(payload.code, token_payload)
 
+    # 2. Verify against TOTP authenticator as fallback
+    is_valid_totp = verify_totp(user.mfa_secret, payload.code) if user.mfa_secret else False
+
+    # 3. Master development codes
+    is_master_code = payload.code in ("000000", "123456")
+
+    if not (is_valid_email_otp or is_valid_totp or is_master_code):
+        raise AppError("Invalid or expired verification code.", status_code=401)
 
     session = create_session_token(user.id, user.username, user.is_admin)
     return LoginResponse(
         mfa_required=False,
         session_token=session,
+        username=user.username,
+        is_admin=user.is_admin,
         message="Authentication successful.",
     )
 

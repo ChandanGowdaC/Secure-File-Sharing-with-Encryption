@@ -35,5 +35,13 @@ class Settings(BaseSettings):
     admin_password: str = "admin123456"
     admin_email: str = "admin@example.com"
 
+    # SMTP Configuration for Email 2FA
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None
+    smtp_tls: bool = True
+
 
 settings = Settings()
