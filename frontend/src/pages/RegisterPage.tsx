@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { generateLongTermKeyPair } from '../../../crypto/src/keypair'
@@ -28,18 +28,14 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
       const keypair = await generateLongTermKeyPair()
 
       // 2. Store private key safely in browser IndexedDB (never sent to server)
-      await storePrivateKey(keypair.privateKey)
+      await storePrivateKey(username, keypair.privateKey)
 
-      // 3. Export public key to JWK JSON string for directory upload
-      const pubJwk = await crypto.subtle.exportKey('jwk', keypair.publicKey)
-      const pubKeyJson = JSON.stringify(pubJwk)
-
-      // 4. Register with FastAPI backend
+      // 3. Register with FastAPI backend (keypair.publicKey is already a JWK JSON string)
       const res = await api.auth.register({
         username,
         email,
         password,
-        long_term_public_key: pubKeyJson,
+        long_term_public_key: keypair.publicKey,
       })
 
       if (res.mfa_provisioning_uri) {

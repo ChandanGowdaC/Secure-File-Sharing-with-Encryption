@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route, Link } from 'react-router-dom'
 
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import UploadPage from './pages/UploadPage'
 import InboxPage from './pages/InboxPage'
 import AdminPage from './pages/AdminPage'
-import { getAuthToken, setAuthToken } from './api/client'
+import { setAuthToken } from './api/client'
 import { getStoredPrivateKey } from '../../crypto/src/keystore'
 
 function Navigation({ user, onLogout }: { user: string | null; onLogout: () => void }) {
@@ -65,7 +65,11 @@ export default function App() {
   const [hasPrivateKey, setHasPrivateKey] = useState<boolean>(false)
 
   useEffect(() => {
-    getStoredPrivateKey().then(key => setHasPrivateKey(!!key)).catch(() => setHasPrivateKey(false))
+    if (!currentUser) {
+      setHasPrivateKey(false)
+      return
+    }
+    getStoredPrivateKey(currentUser).then(key => setHasPrivateKey(!!key)).catch(() => setHasPrivateKey(false))
   }, [currentUser])
 
   const handleLoginSuccess = (username: string) => {

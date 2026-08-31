@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { getStoredPrivateKey } from '../../../crypto/src/keystore'
 import { deriveTransferKey } from '../../../crypto/src/hkdf'
 import { decryptFile } from '../../../crypto/src/aes-gcm'
-import { CRYPTO_PARAMS } from '../../../crypto/src/constants'
 
 interface PendingTransferItem {
   transfer_id: string
@@ -35,15 +34,6 @@ export default function InboxPage() {
     fetchPending()
   }, [])
 
-  const base64ToArrayBuffer = (base64: string): Uint8Array => {
-    const binary = atob(base64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i)
-    }
-    return bytes
-  }
-
   const handleDecryptAndDownload = async (transferId: string) => {
     setActiveTransferId(transferId)
     setError(null)
@@ -54,33 +44,28 @@ export default function InboxPage() {
       const payload = await api.transfers.deliver(transferId)
 
       setStatusMsg('Step 2/4: Retrieving long-term private key from IndexedDB...')
-      const receiverPrivateKey = await getStoredPrivateKey()
+      const currentUser = localStorage.getItem('sfs_username') || ''
+      const receiverPrivateKey = await getStoredPrivateKey(currentUser)
       if (!receiverPrivateKey) {
         throw new Error('Long-term private key missing from IndexedDB! Please re-register or restore key.')
       }
 
-      setStatusMsg('Step 3/4: Importing sender ephemeral public key & deriving transfer key...')
-      const ephemeralPubJwk = JSON.parse(payload.sender_ephemeral_public_key)
-      const senderEphemeralPublicKey = await crypto.subtle.importKey(
-        'jwk',
-        ephemeralPubJwk,
-        CRYPTO_PARAMS.ECDH,
-        false,
-        []
-      )
-
-      const transferKey = await deriveTransferKey(receiverPrivateKey, senderEphemeralPublicKey)
+      setStatusMsg('Step 3/4: Deriving transfer key...')
+      const transferKey = await deriveTransferKey(receiverPrivateKey, payload.sender_ephemeral_public_key)
 
       setStatusMsg('Step 4/4: Decrypting ciphertext & verifying AES-256-GCM auth tag...')
-      const ciphertextBytes = base64ToArrayBuffer(payload.ciphertext)
-      const nonceBytes = base64ToArrayBuffer(payload.nonce)
-      const tagBytes = base64ToArrayBuffer(payload.auth_tag)
-
-      const decryptedBytes = await decryptFile(ciphertextBytes, nonceBytes, tagBytes, transferKey)
+      const decryptedBuffer = await decryptFile(
+        {
+          ciphertext: payload.ciphertext,
+          nonce: payload.nonce,
+          authTag: payload.auth_tag,
+        },
+        transferKey
+      )
 
       // 2. Trigger browser download
       const filename = payload.original_filename || `decrypted_${transferId.slice(0, 8)}.bin`
-      const blob = new Blob([decryptedBytes])
+      const blob = new Blob([decryptedBuffer])
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
