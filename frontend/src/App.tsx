@@ -6,12 +6,12 @@ import LoginPage from './pages/LoginPage'
 import UploadPage from './pages/UploadPage'
 import InboxPage from './pages/InboxPage'
 import AdminPage from './pages/AdminPage'
-import { setAuthToken } from './api/client'
+import { setAuthToken, api } from './api/client'
 import { getStoredPrivateKey } from '../../crypto/src/keystore'
 
 import { Navigate } from 'react-router-dom'
 
-function Navigation({ user, isAdmin, onLogout }: { user: string | null; isAdmin: boolean; onLogout: () => void }) {
+function Navigation({ user, isAdmin, unreadCount, onLogout }: { user: string | null; isAdmin: boolean; unreadCount: number; onLogout: () => void }) {
   return (
     <nav style={{
       display: 'flex',
@@ -44,7 +44,24 @@ function Navigation({ user, isAdmin, onLogout }: { user: string | null; isAdmin:
         {user ? (
           <>
             <Link to="/upload" style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 500 }}>📤 Send File</Link>
-            <Link to="/inbox" style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 500 }}>📥 Inbox</Link>
+            <Link to="/inbox" style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span>📥 Inbox</span>
+              {unreadCount > 0 && (
+                <span style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '2px 7px',
+                  borderRadius: '10px',
+                  lineHeight: '1.1',
+                  boxShadow: '0 0 10px rgba(239, 68, 68, 0.6)',
+                  animation: 'pulse 2s infinite'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
             {isAdmin && (
               <Link to="/admin" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 600, background: 'rgba(99, 102, 241, 0.1)', padding: '0.3rem 0.7rem', borderRadius: '6px' }}>
                 ⚙️ Audit Logs (Admin)
@@ -71,14 +88,34 @@ function Navigation({ user, isAdmin, onLogout }: { user: string | null; isAdmin:
 export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(() => localStorage.getItem('sfs_username'))
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem('sfs_is_admin') === 'true')
+  const [unreadCount, setUnreadCount] = useState<number>(0)
   const [hasPrivateKey, setHasPrivateKey] = useState<boolean>(false)
+
+  const checkUnread = async () => {
+    if (!currentUser) {
+      setUnreadCount(0)
+      return
+    }
+    try {
+      const res = await api.transfers.pending()
+      if (res && res.transfers) {
+        setUnreadCount(res.transfers.length)
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   useEffect(() => {
     if (!currentUser) {
       setHasPrivateKey(false)
+      setUnreadCount(0)
       return
     }
     getStoredPrivateKey(currentUser).then(key => setHasPrivateKey(!!key)).catch(() => setHasPrivateKey(false))
+    checkUnread()
+    const interval = setInterval(checkUnread, 8000)
+    return () => clearInterval(interval)
   }, [currentUser])
 
   const handleLoginSuccess = (username: string, adminStatus: boolean = false) => {
@@ -98,7 +135,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navigation user={currentUser} isAdmin={isAdmin} onLogout={handleLogout} />
+      <Navigation user={currentUser} isAdmin={isAdmin} unreadCount={unreadCount} onLogout={handleLogout} />
       
       <main className="app-container" style={{ flex: 1 }}>
         {currentUser && !hasPrivateKey && currentUser !== 'admin' && (
