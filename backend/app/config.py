@@ -43,5 +43,10 @@ class Settings(BaseSettings):
     smtp_from: Optional[str] = None
     smtp_tls: bool = True
 
+    # HTTP Email API (Port 443 - Recommended on Render/Vercel free tier)
+    resend_api_key: Optional[str] = None
+    resend_from: Optional[str] = "onboarding@resend.dev"
+    brevo_api_key: Optional[str] = None
+
 
 settings = Settings()
