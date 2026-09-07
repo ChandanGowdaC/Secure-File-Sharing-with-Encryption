@@ -28,14 +28,30 @@ from app.utils.security import (
 )
 
 
+from sqlalchemy import func
+
+
 def register_user(db: Session, payload: RegisterRequest) -> RegisterResponse:
-    if db.query(User).filter((User.username == payload.username) | (User.email == payload.email)).first():
-        raise AppError("Username or email already registered.", status_code=409)
+    clean_username = payload.username.strip().lower()
+    clean_email = payload.email.strip().lower()
+
+    existing_user = (
+        db.query(User)
+        .filter(
+            (func.lower(User.username) == clean_username)
+            | (func.lower(User.email) == clean_email)
+        )
+        .first()
+    )
+    if existing_user:
+        if existing_user.username.lower() == clean_username:
+            raise AppError("This username is already taken. Please choose another username.", status_code=409)
+        raise AppError("An account with this email address is already registered.", status_code=409)
 
     mfa_secret = generate_mfa_secret()
     user = User(
-        username=payload.username,
-        email=payload.email,
+        username=clean_username,
+        email=clean_email,
         hashed_password=hash_password(payload.password),
         mfa_secret=mfa_secret,
         long_term_public_key=payload.long_term_public_key,
@@ -53,9 +69,13 @@ def register_user(db: Session, payload: RegisterRequest) -> RegisterResponse:
 
 
 def login_user(db: Session, payload: LoginRequest) -> LoginResponse:
+    identifier = payload.username_or_email.strip().lower()
     user = (
         db.query(User)
-        .filter((User.username == payload.username_or_email) | (User.email == payload.username_or_email))
+        .filter(
+            (func.lower(User.username) == identifier)
+            | (func.lower(User.email) == identifier)
+        )
         .first()
     )
     if user is None or not verify_password(payload.password, user.hashed_password):
@@ -123,9 +143,11 @@ def lookup_public_key(
 
     query = db.query(User)
     if username:
-        user = query.filter(User.username == username).first()
+        clean_user = username.strip().lower()
+        user = query.filter(func.lower(User.username) == clean_user).first()
     else:
-        user = query.filter(User.email == email).first()
+        clean_mail = email.strip().lower()
+        user = query.filter(func.lower(User.email) == clean_mail).first()
 
     if user is None:
         return PublicKeyLookupResponse(found=False, message="Receiver not found.")

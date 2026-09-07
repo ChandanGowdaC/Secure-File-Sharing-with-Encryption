@@ -180,7 +180,7 @@ export default function App() {
         borderTop: '1px solid var(--border-card)',
         marginTop: '3rem'
       }}>
-        Secure E2EE File Sharing • Zero-Knowledge Architecture (FastAPI + React + Web Crypto API)
+        Made by Prabhav, Chandan and Sucheth
       </footer>
     </div>
   )
