@@ -191,6 +191,10 @@ export default function App() {
           Made by <span style={{ color: '#818cf8' }}>Chandan Gowda C</span>, 241IT016, <span style={{ color: '#818cf8' }}>Prabhav P</span>, 241IT053 and <span style={{ color: '#818cf8' }}>Sucheth K Katte</span>, 241IT078
         </div>
 
+        <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+          Under the guidance of <span style={{ color: '#818cf8', fontWeight: 600 }}>Dr. Jaidhar C D</span>
+        </div>
+
         <div style={{ maxWidth: '720px', lineHeight: '1.6', color: '#94a3b8', fontSize: '0.82rem' }}>
           Zero-knowledge end-to-end encrypted file sharing platform powered by Diffie-Hellman (ECDH P-256) key agreement, HKDF-SHA256 derivation, and AES-256-GCM authenticated encryption. Files are encrypted client-side in the browser before transfer—the server never sees unencrypted file data or private keys.
         </div>
@@ -208,7 +212,7 @@ export default function App() {
           fontSize: '0.78rem',
           color: '#cbd5e1'
         }}>
-          🛡️ <strong>Admin Portal Info:</strong> Username: <code style={{ color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>admin</code> &nbsp;|&nbsp; Password: <code style={{ color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>admin123456</code> &nbsp;|&nbsp; Master 2FA Code: <code style={{ color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>000000</code>
+          🛡️ <strong>Admin Details:</strong> Admin email : <a href="mailto:securefilesharing303.project@gmail.com" style={{ color: '#818cf8', textDecoration: 'none' }}>securefilesharing303.project@gmail.com</a>
         </div>
 
         <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>
