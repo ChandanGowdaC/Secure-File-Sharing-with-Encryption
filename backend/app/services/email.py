@@ -48,10 +48,11 @@ def _send_via_brevo(to_email: str, username: str, subject: str, html_content: st
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
+            resp_body = resp.read().decode("utf-8")
             if resp.status in (200, 201, 202):
-                logger.info(f"✅ [EMAIL SERVICE] 2FA OTP sent to {to_email} via Brevo HTTP API.")
+                logger.info(f"✅ [EMAIL SERVICE] 2FA OTP queued for {to_email} via Brevo HTTP API. Response: {resp_body}")
                 return True
-            logger.warning(f"⚠️ [EMAIL SERVICE] Brevo HTTP response: {resp.status}")
+            logger.warning(f"⚠️ [EMAIL SERVICE] Brevo HTTP response: {resp.status} - {resp_body}")
             return False
     except Exception as e:
         logger.error(f"❌ [EMAIL SERVICE] Brevo HTTP API delivery failed: {e}")
