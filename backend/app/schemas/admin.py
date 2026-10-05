@@ -19,7 +19,6 @@ class TransferLogEntry(BaseModel):
     receiver: str
     timestamp: datetime
     status: TransferStatus
-    file_size_bytes: Optional[int] = None
 
 
 class TransferLogResponse(BaseModel):

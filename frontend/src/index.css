@@ -22,8 +22,12 @@
 body {
   background-color: var(--bg-dark);
   background-image:
+    url('/security-background.svg'),
     linear-gradient(160deg, rgba(37, 99, 235, 0.14), transparent 42%),
     linear-gradient(20deg, rgba(20, 184, 166, 0.12), transparent 44%);
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
   background-attachment: fixed;
   color: var(--text-main);
   font-family: var(--font-family);
@@ -165,6 +169,22 @@ h1, h2, h3, h4 {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.btn-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(252, 165, 165, 0.6);
+}
+
 /* Form Inputs */
 .form-group {
   display: flex;
@@ -200,6 +220,12 @@ h1, h2, h3, h4 {
 .form-control:focus {
   border-color: var(--primary-accent);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.field-help {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 /* Badges & Status */
@@ -323,24 +349,58 @@ tr:last-child td {
   font-weight: 700;
 }
 
-.process-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin: 1rem 0 1.25rem;
+.supported-files {
+  margin: 0.25rem 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 12px;
+  background: linear-gradient(110deg, rgba(37, 99, 235, 0.1), rgba(20, 184, 166, 0.07));
 }
 
-.process-strip span {
-  min-height: 2.4rem;
+.supported-files-heading {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.supported-files-heading strong {
+  font-size: 0.9rem;
+}
+
+.supported-files-heading p {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.supported-files-icon {
   display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
   place-items: center;
-  padding: 0.5rem;
-  border: 1px solid var(--border-card);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.15);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  color: #5eead4;
+  font-weight: 700;
+}
+
+.file-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.file-type-chips span {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.36);
   color: #cbd5e1;
-  font-size: 0.82rem;
-  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .btn-full {
@@ -408,7 +468,6 @@ tr:last-child td {
   }
 
   .form-grid,
-  .process-strip,
   .admin-toolbar {
     grid-template-columns: 1fr;
   }

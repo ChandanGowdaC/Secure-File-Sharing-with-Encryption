@@ -16,6 +16,7 @@ from app.schemas.auth import (
     RegisterResponse,
 )
 from app.services.auth import (
+    delete_account as delete_account_service,
     login_user,
     lookup_public_key as lookup_public_key_service,
     register_user,
@@ -60,3 +61,11 @@ def lookup_public_key(
     """F.4 – Lookup receiver long-term public key by username or email."""
     return lookup_public_key_service(db, username=username, email=email)
 
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_current_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Permanently delete the authenticated non-admin account and its transfer metadata."""
+    delete_account_service(db, current_user)

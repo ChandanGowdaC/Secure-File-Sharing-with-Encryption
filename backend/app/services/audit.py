@@ -45,7 +45,6 @@ def get_transfer_logs(db: Session, query: TransferLogQuery) -> TransferLogRespon
             receiver=receiver_user.username,
             timestamp=transfer.created_at,
             status=TransferStatus(transfer.status),
-            file_size_bytes=transfer.file_size_bytes,
         )
         for transfer, sender_user, receiver_user in rows
     ]

@@ -7,14 +7,6 @@ interface LogEntry {
   receiver: string
   timestamp: string
   status: string
-  file_size_bytes?: number | null
-}
-
-function formatFileSize(bytes?: number | null) {
-  if (bytes === null || bytes === undefined) return 'Unknown'
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
 }
 
 export default function AdminPage() {
@@ -97,7 +89,6 @@ export default function AdminPage() {
                   <th>Transfer ID</th>
                   <th>Sender</th>
                   <th>Receiver</th>
-                  <th>File Size</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -112,7 +103,6 @@ export default function AdminPage() {
                     </td>
                     <td>{log.sender}</td>
                     <td>{log.receiver}</td>
-                    <td>{formatFileSize(log.file_size_bytes)}</td>
                     <td>
                       <span className={`badge ${log.status === 'pending' ? 'badge-pending' : 'badge-delivered'}`}>
                         {log.status}

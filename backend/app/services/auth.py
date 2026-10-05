@@ -5,7 +5,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.middleware.errors import AppError
-from app.models import User
+from app.models import Transfer, TransferLogEntry, User
+from app.services.storage import BlobStorageBackend, get_blob_storage
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -157,3 +158,35 @@ def lookup_public_key(
         username=user.username,
         public_key=user.long_term_public_key,
     )
+
+
+def delete_account(
+    db: Session,
+    user: User,
+    storage: BlobStorageBackend | None = None,
+) -> None:
+    """Delete a standard user's account, related transfers, logs, and queued encrypted blobs."""
+    if user.is_admin:
+        raise AppError("Administrator accounts cannot be deleted through the application.", status_code=403)
+
+    storage = storage or get_blob_storage()
+    transfers = db.query(Transfer).filter(
+        (Transfer.sender_id == user.id) | (Transfer.receiver_id == user.id)
+    ).all()
+
+    try:
+        for transfer in transfers:
+            if transfer.blob_path:
+                storage.delete_blob(transfer.blob_path)
+    except Exception as exc:
+        raise AppError("Could not remove queued encrypted files. Account was not deleted.", status_code=503, internal_detail=str(exc)) from exc
+
+    transfer_ids = [transfer.id for transfer in transfers]
+    if transfer_ids:
+        db.query(TransferLogEntry).filter(TransferLogEntry.transfer_id.in_(transfer_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Transfer).filter(Transfer.id.in_(transfer_ids)).delete(synchronize_session=False)
+
+    db.delete(user)
+    db.commit()
