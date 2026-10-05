@@ -71,7 +71,7 @@ export default function InboxPage() {
         transferKey
       )
 
-      // 2. Trigger browser download
+      // 2. Trigger browser download for decrypted file
       const filename = payload.original_filename || `decrypted_${transferId.slice(0, 8)}.bin`
       const blob = new Blob([decryptedBuffer])
       const url = URL.createObjectURL(blob)
@@ -83,10 +83,21 @@ export default function InboxPage() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
+      // 2.5 Trigger browser download for raw encrypted file
+      const rawBlob = new Blob([payload.ciphertext])
+      const rawUrl = URL.createObjectURL(rawBlob)
+      const rawA = document.createElement('a')
+      rawA.href = rawUrl
+      rawA.download = `raw_encrypted_${transferId.slice(0, 8)}.bin`
+      document.body.appendChild(rawA)
+      rawA.click()
+      document.body.removeChild(rawA)
+      URL.revokeObjectURL(rawUrl)
+
       // 3. Acknowledge download completion
       await api.transfers.downloadAck(transferId, { success: true })
 
-      setStatusMsg(`Decryption successful! File '${filename}' downloaded and server copy purged.`)
+      setStatusMsg(`Decryption successful! Files downloaded and server copy purged.`)
       fetchPending()
     } catch (err: any) {
       setError(err.message || 'Decryption failed. Authentication tag mismatch or corrupt ciphertext.')
@@ -153,7 +164,7 @@ export default function InboxPage() {
                       disabled={activeTransferId === item.transfer_id}
                       onClick={() => handleDecryptAndDownload(item.transfer_id)}
                     >
-                      {activeTransferId === item.transfer_id ? 'Decrypting...' : '🔒 Decrypt & Download'}
+                      {activeTransferId === item.transfer_id ? 'Decrypting...' : '🔒 Decrypt & Download Both'}
                     </button>
                   </td>
                 </tr>

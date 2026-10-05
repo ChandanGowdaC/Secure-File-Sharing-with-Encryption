@@ -69,3 +69,20 @@ def delete_current_account(
 ) -> None:
     """Permanently delete the authenticated non-admin account and its transfer metadata."""
     delete_account_service(db, current_user)
+
+@router.delete("/users/{username}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    username: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete a user account by username."""
+    if current_user.username != username and not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this account")
+    
+    user_to_delete = db.query(User).filter(User.username == username).first()
+    if not user_to_delete:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+    delete_account_service(db, user_to_delete)
+
