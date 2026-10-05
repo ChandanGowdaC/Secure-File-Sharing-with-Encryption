@@ -184,9 +184,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             {loading ? 'Authenticating...' : 'Sign In with 2FA'}
           </button>
 
-          <div style={{ marginTop: '1.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            🔑 <strong>Admin Credentials:</strong> <code>admin</code> / <code>admin123456</code> (Full audit logs access)
-          </div>
         </form>
       )}
     </div>

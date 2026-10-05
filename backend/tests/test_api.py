@@ -158,7 +158,7 @@ def test_full_e2e_backend_workflow():
     assert len(entries) >= 1
     log_transfer_ids = [e["transfer_id"] for e in entries]
     assert transfer_id in log_transfer_ids
-    assert any(e["file_size_bytes"] == len(b"SECRET_ENCRYPTED_FILE_BYTES") for e in entries)
+    assert all("file_size_bytes" not in e for e in entries)
 
 
 def test_upload_rejects_files_over_100_mb():
