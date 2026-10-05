@@ -15,7 +15,7 @@ from app.utils.security import hash_password
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB tables
-    init_db()
+    init_db(reset=settings.reset_database_on_startup)
     
     # Seed admin user if not existing
     db = SessionLocal()
@@ -65,4 +65,3 @@ app.include_router(admin.router, prefix=settings.api_prefix)
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
-

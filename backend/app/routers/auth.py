@@ -16,6 +16,7 @@ from app.schemas.auth import (
     RegisterResponse,
 )
 from app.services.auth import (
+    delete_account as delete_account_service,
     login_user,
     lookup_public_key as lookup_public_key_service,
     register_user,
@@ -59,4 +60,29 @@ def lookup_public_key(
 ) -> PublicKeyLookupResponse:
     """F.4 – Lookup receiver long-term public key by username or email."""
     return lookup_public_key_service(db, username=username, email=email)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_current_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Permanently delete the authenticated non-admin account and its transfer metadata."""
+    delete_account_service(db, current_user)
+
+@router.delete("/users/{username}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    username: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete a user account by username."""
+    if current_user.username != username and not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this account")
+    
+    user_to_delete = db.query(User).filter(User.username == username).first()
+    if not user_to_delete:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+    delete_account_service(db, user_to_delete)
 
