@@ -7,11 +7,11 @@ import UploadPage from './pages/UploadPage'
 import InboxPage from './pages/InboxPage'
 import AdminPage from './pages/AdminPage'
 import { setAuthToken, api } from './api/client'
-import { getStoredPrivateKey } from '../../crypto/src/keystore'
+import { clearStoredPrivateKey, getStoredPrivateKey } from '../../crypto/src/keystore'
 
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 
-function Navigation({ user, isAdmin, unreadCount, onLogout }: { user: string | null; isAdmin: boolean; unreadCount: number; onLogout: () => void }) {
+function Navigation({ user, isAdmin, unreadCount, onLogout, onDeleteAccount }: { user: string | null; isAdmin: boolean; unreadCount: number; onLogout: () => void; onDeleteAccount: () => void }) {
   return (
     <nav style={{
       display: 'flex',
@@ -73,6 +73,11 @@ function Navigation({ user, isAdmin, unreadCount, onLogout }: { user: string | n
             <button onClick={onLogout} className="btn-secondary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
               Logout
             </button>
+            {!isAdmin && (
+              <button onClick={onDeleteAccount} className="btn-danger" style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
+                Delete account
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -86,6 +91,7 @@ function Navigation({ user, isAdmin, unreadCount, onLogout }: { user: string | n
 }
 
 export default function App() {
+  const navigate = useNavigate()
   const [currentUser, setCurrentUser] = useState<string | null>(() => localStorage.getItem('sfs_username'))
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem('sfs_is_admin') === 'true')
   const [unreadCount, setUnreadCount] = useState<number>(0)
@@ -133,12 +139,29 @@ export default function App() {
     setIsAdmin(false)
   }
 
+  const handleDeleteAccount = async () => {
+    if (!currentUser || isAdmin) return
+    const confirmed = window.confirm(
+      'Delete your account permanently? Your queued encrypted transfers and account metadata will be removed. This cannot be undone.'
+    )
+    if (!confirmed) return
+
+    try {
+      await api.auth.deleteAccount()
+      await clearStoredPrivateKey(currentUser)
+      handleLogout()
+      navigate('/login', { replace: true })
+    } catch (err: any) {
+      window.alert(err.message || 'Account deletion failed. Please try again.')
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navigation user={currentUser} isAdmin={isAdmin} unreadCount={unreadCount} onLogout={handleLogout} />
+      <Navigation user={currentUser} isAdmin={isAdmin} unreadCount={unreadCount} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} />
       
       <main className="app-container" style={{ flex: 1 }}>
-        {currentUser && !hasPrivateKey && currentUser !== 'admin' && (
+        {currentUser && !hasPrivateKey && !isAdmin && (
           <div className="alert alert-info">
             💡 <strong>Crypto Key Alert:</strong> Long-term private key not detected in IndexedDB. Generate or restore your cryptographic identity on the Register page.
           </div>
@@ -222,4 +245,3 @@ export default function App() {
     </div>
   )
 }
-

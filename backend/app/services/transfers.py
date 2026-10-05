@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
+from pathlib import PurePath
 from typing import List
 
 from sqlalchemy.orm import Session, joinedload
@@ -24,6 +25,12 @@ from app.services.audit import log_event
 from app.services.storage import BlobStorageBackend, get_blob_storage
 
 
+SUPPORTED_FILE_EXTENSIONS = {
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".txt", ".csv", ".jpg", ".jpeg", ".png",
+}
+
+
 def _object_key(transfer_id: str) -> str:
     return f"transfers/{transfer_id}.bin"
 
@@ -34,6 +41,13 @@ def _validate_file_size(ciphertext: bytes, payload: UploadTransferRequest) -> in
         limit_mb = settings.max_upload_size_bytes // (1024 * 1024)
         raise AppError(f"File size exceeds the {limit_mb} MB upload limit.", status_code=413)
     return reported_size
+
+
+def _validate_file_type(payload: UploadTransferRequest) -> None:
+    extension = PurePath(payload.original_filename or "").suffix.lower()
+    if extension not in SUPPORTED_FILE_EXTENSIONS:
+        supported = "PDF, Word, Excel, PowerPoint, text, CSV, JPG, and PNG"
+        raise AppError(f"Unsupported file type. Supported file types: {supported}.", status_code=415)
 
 
 def upload_transfer(
@@ -56,6 +70,7 @@ def upload_transfer(
         raise AppError("Corrupted upload payload.", status_code=400, internal_detail=str(exc)) from exc
 
     file_size_bytes = _validate_file_size(ciphertext, payload)
+    _validate_file_type(payload)
 
     transfer_id = str(uuid.uuid4())
     object_key = _object_key(transfer_id)

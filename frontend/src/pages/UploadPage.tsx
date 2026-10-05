@@ -5,6 +5,11 @@ import { deriveTransferKey } from '../../../crypto/src/hkdf'
 import { encryptFile } from '../../../crypto/src/aes-gcm'
 
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
+const SUPPORTED_EXTENSIONS = [
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'jpg', 'jpeg', 'png',
+]
+const FILE_INPUT_ACCEPT = SUPPORTED_EXTENSIONS.map(extension => `.${extension}`).join(',')
+const SUPPORTED_FORMATS_LABEL = 'PDF, Word, Excel, PowerPoint, text, CSV, JPG and PNG'
 
 function formatFileSize(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
@@ -24,6 +29,13 @@ export default function UploadPage() {
     setStatusMsg(null)
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0]
+      const extension = selectedFile.name.split('.').pop()?.toLowerCase()
+      if (!extension || !SUPPORTED_EXTENSIONS.includes(extension)) {
+        setFile(null)
+        e.target.value = ''
+        setError(`“${selectedFile.name}” is not supported. Choose a ${SUPPORTED_FORMATS_LABEL} file.`)
+        return
+      }
       if (selectedFile.size > MAX_UPLOAD_SIZE_BYTES) {
         setFile(null)
         e.target.value = ''
@@ -39,6 +51,11 @@ export default function UploadPage() {
     if (!file || !receiverUsername) return
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
       setError('Maximum upload size is 100 MB. Choose a smaller file.')
+      return
+    }
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (!extension || !SUPPORTED_EXTENSIONS.includes(extension)) {
+      setError(`“${file.name}” is not supported. Choose a ${SUPPORTED_FORMATS_LABEL} file.`)
       return
     }
 
@@ -127,8 +144,10 @@ export default function UploadPage() {
                 type="file"
                 required
                 className="form-control"
+                accept={FILE_INPUT_ACCEPT}
                 onChange={handleFileChange}
               />
+              <small className="field-help">Supported: {SUPPORTED_FORMATS_LABEL}. Maximum size: 100 MB.</small>
             </div>
           </div>
 
@@ -142,11 +161,19 @@ export default function UploadPage() {
             </div>
           )}
 
-          <div className="process-strip">
-            <span>Lookup key</span>
-            <span>Ephemeral DH</span>
-            <span>AES-GCM</span>
-            <span>Queue blob</span>
+          <div className="supported-files" aria-label="Supported file types">
+            <div className="supported-files-heading">
+              <span className="supported-files-icon" aria-hidden="true">✓</span>
+              <div>
+                <strong>Supported file types</strong>
+                <p>Choose a document, spreadsheet, presentation, image, or text file.</p>
+              </div>
+            </div>
+            <div className="file-type-chips">
+              {['PDF', 'DOCX', 'XLSX', 'PPTX', 'TXT', 'CSV', 'JPG', 'PNG'].map(type => (
+                <span key={type}>{type}</span>
+              ))}
+            </div>
           </div>
 
           <button type="submit" disabled={loading || !file} className="btn-primary btn-full">
