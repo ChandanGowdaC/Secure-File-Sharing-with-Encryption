@@ -17,25 +17,32 @@ if db_url.startswith("postgres://"):
 engine = create_engine(
     db_url,
     connect_args={"check_same_thread": False} if db_url.startswith("sqlite") else {},
+    pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def wipe_all_tables() -> None:
     """Safely drop all existing database tables, disabling foreign key constraints."""
-    inspector = inspect(engine)
-    existing_tables = inspector.get_table_names()
     with engine.begin() as connection:
         if db_url.startswith("sqlite"):
+            inspector = inspect(connection)
+            existing_tables = inspector.get_table_names()
             connection.execute(text("PRAGMA foreign_keys = OFF;"))
             for table in existing_tables:
                 connection.execute(text(f'DROP TABLE IF EXISTS "{table}";'))
             connection.execute(text("PRAGMA foreign_keys = ON;"))
         elif "postgres" in db_url:
-            for table in existing_tables:
-                connection.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE;'))
+            # Atomic drop of entire public schema cascades all tables, constraints, sequences
+            try:
+                connection.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
+            except Exception:
+                inspector = inspect(connection)
+                for table in inspector.get_table_names():
+                    connection.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE;'))
         else:
             Base.metadata.drop_all(bind=connection)
+
 
 
 def init_db(reset: bool = False) -> None:

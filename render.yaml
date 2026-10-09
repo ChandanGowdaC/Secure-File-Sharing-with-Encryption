@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: secure-file-sharing-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: secure-file-sharing-db
+          property: connectionString
+      - key: RESET_DATABASE_ON_STARTUP
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: STORAGE_BACKEND
+        value: "local"
+      - key: CORS_ORIGINS
+        value: '["*"]'
+
+databases:
+  - name: secure-file-sharing-db
+    databaseName: secure_file_sharing
+    user: sfs_admin
+    region: oregon
+    plan: free
