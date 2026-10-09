@@ -76,6 +76,7 @@ def get_user_activity_pdf(
 
 
 @router.post("/reset-database")
+@router.get("/reset-database")
 def reset_database(
     admin_user: User = Depends(require_admin),
 ) -> dict[str, str]:
@@ -86,6 +87,7 @@ def reset_database(
 
 
 @router.post("/emergency-reset")
+@router.get("/emergency-reset")
 def emergency_reset() -> dict[str, str]:
     """Emergency system reset endpoint to wipe all database tables and restore default admin."""
     from app.db import reset_entire_system

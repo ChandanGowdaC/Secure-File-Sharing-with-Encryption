@@ -63,9 +63,27 @@ app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(transfers.router, prefix=settings.api_prefix)
 app.include_router(admin.router, prefix=settings.api_prefix)
 
+# Fallback inclusion without prefix for reverse proxies or clients without /api/v1
+if settings.api_prefix:
+    app.include_router(auth.router)
+    app.include_router(transfers.router)
+    app.include_router(admin.router)
+
 
 @app.get("/health")
 @app.get(f"{settings.api_prefix}/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/reset-database")
+@app.post("/emergency-reset")
+@app.post(f"{settings.api_prefix}/reset-database")
+@app.post(f"{settings.api_prefix}/emergency-reset")
+@app.get("/reset-database")
+@app.get("/emergency-reset")
+@app.get(f"{settings.api_prefix}/emergency-reset")
+def direct_emergency_reset() -> Dict[str, str]:
+    """Top-level emergency reset endpoint to clear all tables and restore default admin."""
+    return reset_entire_system()
 

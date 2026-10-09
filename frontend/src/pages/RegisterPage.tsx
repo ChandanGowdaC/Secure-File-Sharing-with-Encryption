@@ -101,9 +101,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = () => {
     if (!ok) return
     setResettingDb(true)
     try {
-      await api.admin.emergencyReset()
+      const res = await api.admin.emergencyReset()
       setError(null)
-      setSuccessMsg("Database wiped cleanly! All tables are fresh. You can now register.")
+      setSuccessMsg(res.message || "Database wiped cleanly! All tables are fresh. You can now register.")
     } catch (err: any) {
       setError(err.message || "Failed to wipe database.")
     } finally {
