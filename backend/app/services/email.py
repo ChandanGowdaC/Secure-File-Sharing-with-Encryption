@@ -196,11 +196,11 @@ def send_password_reset_email(to_email: str, username: str, reset_link: str) -> 
     <head>
         <meta charset="utf-8">
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafb; color: #1e293b; padding: 20px; }
-            .card { max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-            .header { font-size: 20px; font-weight: bold; color: #4338ca; margin-bottom: 15px; text-align: center; }
-            .button { background: #4f46e5; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; margin: 20px 0; }
-            .footer { font-size: 12px; color: #64748b; text-align: center; margin-top: 20px; }
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafb; color: #1e293b; padding: 20px; }}
+            .card {{ max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
+            .header {{ font-size: 20px; font-weight: bold; color: #4338ca; margin-bottom: 15px; text-align: center; }}
+            .button {{ background: #4f46e5; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; margin: 20px 0; }}
+            .footer {{ font-size: 12px; color: #64748b; text-align: center; margin-top: 20px; }}
         </style>
     </head>
     <body>

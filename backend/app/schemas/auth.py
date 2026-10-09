@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
@@ -30,6 +31,16 @@ class LoginResponse(BaseModel):
     is_admin: bool = False
     masked_email: Optional[str] = None
     username: Optional[str] = None
+    last_login_at: Optional[datetime] = None
+
+
+class UserMeResponse(BaseModel):
+    username: str
+    email: str
+    is_admin: bool
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+
 
 
 class MfaVerifyRequest(BaseModel):

@@ -29,21 +29,21 @@ class User(Base):
     received_transfers: Mapped[list["Transfer"]] = relationship(
         back_populates="receiver", foreign_keys="Transfer.receiver_id"
     )
-    activity_logs: Mapped[list["ActivityLog"]] = relationship(foreign_keys="ActivityLog.user_id")
+    activity_logs: Mapped[list["ActivityLog"]] = relationship(back_populates="user", foreign_keys="ActivityLog.user_id")
 
 
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     username: Mapped[str] = mapped_column(String(64), index=True)
     action: Mapped[str] = mapped_column(String(128))
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    user: Mapped["User | None"] = relationship(foreign_keys=[user_id])
+    user: Mapped["User | None"] = relationship(back_populates="activity_logs", foreign_keys=[user_id])
 
 
 class Transfer(Base):

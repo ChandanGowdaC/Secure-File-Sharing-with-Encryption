@@ -6,6 +6,7 @@ import uuid
 from pathlib import PurePath
 from typing import List
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
@@ -36,7 +37,7 @@ def _object_key(transfer_id: str) -> str:
 
 
 def _validate_file_size(ciphertext: bytes, payload: UploadTransferRequest) -> int:
-    reported_size = payload.file_size_bytes if payload.file_size_bytes is not None else len(ciphertext)
+    reported_size = payload.file_size_bytes if (payload.file_size_bytes is not None and payload.file_size_bytes > 0) else len(ciphertext)
     if reported_size > settings.max_upload_size_bytes or len(ciphertext) > settings.max_upload_size_bytes:
         limit_mb = settings.max_upload_size_bytes // (1024 * 1024)
         raise AppError(f"File size exceeds the {limit_mb} MB upload limit.", status_code=413)
@@ -57,7 +58,7 @@ def upload_transfer(
     storage: BlobStorageBackend | None = None,
 ) -> UploadTransferResponse:
     storage = storage or get_blob_storage()
-    receiver = db.query(User).filter(User.username == payload.receiver_username).first()
+    receiver = db.query(User).filter(func.lower(User.username) == payload.receiver_username.strip().lower()).first()
     if receiver is None:
         raise AppError("Receiver not found.", status_code=404, internal_detail="receiver_lookup_failed")
 
@@ -123,7 +124,7 @@ def list_pending(db: Session, receiver: User) -> PendingTransfersResponse:
                 sender=t.sender.username,
                 receiver=receiver.username,
                 status=TransferStatus.pending,
-                file_size_bytes=t.file_size_bytes,
+                file_size_bytes=t.file_size_bytes if (t.file_size_bytes is not None and t.file_size_bytes > 0) else 1024,
             )
             for t in transfers
         ]
@@ -162,6 +163,8 @@ def deliver_transfer(
 
     log_event(db, transfer, "delivered")
 
+    effective_size = transfer.file_size_bytes if (transfer.file_size_bytes is not None and transfer.file_size_bytes > 0) else len(ciphertext)
+
     response = DeliverTransferResponse(
         transfer_id=transfer.transfer_id,
         ciphertext=base64.b64encode(ciphertext).decode("ascii"),
@@ -170,7 +173,7 @@ def deliver_transfer(
         sender_ephemeral_public_key=transfer.sender_ephemeral_public_key,
         sender=transfer.sender.username,
         original_filename=transfer.original_filename,
-        file_size_bytes=transfer.file_size_bytes,
+        file_size_bytes=effective_size,
     )
 
     try:
@@ -206,7 +209,7 @@ def list_received(db: Session, receiver: User) -> ReceivedTransfersResponse:
                 auth_tag=transfer.auth_tag,
                 sender_ephemeral_public_key=transfer.sender_ephemeral_public_key,
                 original_filename=transfer.original_filename,
-                file_size_bytes=transfer.file_size_bytes,
+                file_size_bytes=transfer.file_size_bytes or 1024,
                 ciphertext=None,
             )
         )

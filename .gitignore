@@ -17,6 +17,7 @@ backend/.env
 
 # Storage & database
 backend/storage/
+*.db
 backend/*.db
 
 # Build output

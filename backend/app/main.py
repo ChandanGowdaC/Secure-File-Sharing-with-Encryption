@@ -49,7 +49,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["*"] if "*" in settings.cors_origins else settings.cors_origins,
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,5 +64,7 @@ app.include_router(admin.router, prefix=settings.api_prefix)
 
 
 @app.get("/health")
+@app.get(f"{settings.api_prefix}/health")
 def health_check() -> Dict[str, str]:
     return {"status": "ok"}
+

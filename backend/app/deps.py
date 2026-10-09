@@ -4,6 +4,7 @@ from typing import Generator, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
@@ -32,9 +33,15 @@ def get_current_user(
     if payload is None or payload.get("type") != "session":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session.")
 
-    user = db.get(User, int(payload["sub"]))
+    user = None
+    sub = payload.get("sub")
+    if sub and str(sub).isdigit():
+        user = db.get(User, int(sub))
+    if user is None and "username" in payload:
+        user = db.query(User).filter(func.lower(User.username) == payload["username"].strip().lower()).first()
+
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or session expired.")
 
     return user
 

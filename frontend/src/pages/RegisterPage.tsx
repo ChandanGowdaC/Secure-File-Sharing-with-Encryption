@@ -5,10 +5,10 @@ import { generateLongTermKeyPair } from '../../../crypto/src/keypair'
 import { storePrivateKey } from '../../../crypto/src/keystore'
 
 interface RegisterPageProps {
-  onRegisterSuccess: (username: string) => void
+  onRegisterSuccess?: (username: string) => void
 }
 
-export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess }) => {
+export const RegisterPage: React.FC<RegisterPageProps> = () => {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -74,14 +74,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess })
       await storePrivateKey(username, keypair.privateKey)
 
       // 3. Register with FastAPI backend (keypair.publicKey is already a JWK JSON string)
-      const res = await api.auth.register({
+      await api.auth.register({
         username,
         email,
         password,
         long_term_public_key: keypair.publicKey,
       })
 
-      onRegisterSuccess(res.username)
       setSuccessMsg('Account and cryptographic keys created successfully! Redirecting to sign in...')
       setTimeout(() => {
         navigate('/login')

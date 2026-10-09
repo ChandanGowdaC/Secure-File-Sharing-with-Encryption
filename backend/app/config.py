@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     local_blob_path: str = "/tmp/secure-file-blobs"
     max_upload_size_bytes: int = 100 * 1024 * 1024
 
-    cors_origins: List[str] = ["http://localhost:5173"]
+    cors_origins: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"]
 
     admin_username: str = "admin"
     admin_password: str = "admin123456"

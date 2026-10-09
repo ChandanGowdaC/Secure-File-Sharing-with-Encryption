@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
@@ -36,11 +35,16 @@ def _ensure_transfer_file_size_column() -> None:
     if "transfers" not in inspector.get_table_names():
         return
     columns = {column["name"] for column in inspector.get_columns("transfers")}
-    if "file_size_bytes" in columns:
-        return
     column_type = "INTEGER" if db_url.startswith("sqlite") else "INT"
-    with engine.begin() as connection:
-        connection.execute(text(f"ALTER TABLE transfers ADD COLUMN file_size_bytes {column_type}"))
+    if "file_size_bytes" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text(f"ALTER TABLE transfers ADD COLUMN file_size_bytes {column_type}"))
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE transfers SET file_size_bytes = 1024 WHERE file_size_bytes IS NULL"))
+    except Exception:
+        pass
+
 
 def _ensure_user_last_login_column() -> None:
     inspector = inspect(engine)
@@ -52,6 +56,7 @@ def _ensure_user_last_login_column() -> None:
     column_type = "DATETIME" if db_url.startswith("sqlite") else "TIMESTAMP"
     with engine.begin() as connection:
         connection.execute(text(f"ALTER TABLE users ADD COLUMN last_login_at {column_type}"))
+
 
 def _ensure_activity_logs_table() -> None:
     inspector = inspect(engine)

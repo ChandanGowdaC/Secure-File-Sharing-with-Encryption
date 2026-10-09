@@ -8,18 +8,28 @@ from sqlalchemy.orm import Session
 from app.deps import get_current_user, get_db
 from app.models import User
 from app.schemas.auth import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     LoginResponse,
     MfaVerifyRequest,
     PublicKeyLookupResponse,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    UserMeResponse,
 )
 from app.services.auth import (
+    change_password as change_password_service,
     delete_account as delete_account_service,
+    forgot_password as forgot_password_service,
     login_user,
     lookup_public_key as lookup_public_key_service,
     register_user,
+    reset_password as reset_password_service,
     verify_mfa as verify_mfa_service,
 )
 
@@ -62,6 +72,20 @@ def lookup_public_key(
     return lookup_public_key_service(db, username=username, email=email)
 
 
+@router.get("/me", response_model=UserMeResponse)
+def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
+) -> UserMeResponse:
+    """Return profile info of current authenticated user, including last_login_at."""
+    return UserMeResponse(
+        username=current_user.username,
+        email=current_user.email,
+        is_admin=current_user.is_admin,
+        last_login_at=current_user.last_login_at,
+        created_at=current_user.created_at,
+    )
+
+
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_current_account(
     current_user: User = Depends(get_current_user),
@@ -69,6 +93,7 @@ def delete_current_account(
 ) -> None:
     """Permanently delete the authenticated non-admin account and its transfer metadata."""
     delete_account_service(db, current_user)
+
 
 @router.delete("/users/{username}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
@@ -79,31 +104,28 @@ def delete_account(
     """Delete a user account by username."""
     if current_user.username != username and not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this account")
-    
+
     user_to_delete = db.query(User).filter(User.username == username).first()
     if not user_to_delete:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        
+
     delete_account_service(db, user_to_delete)
 
 
-from app.schemas.auth import (
-    ForgotPasswordRequest, ForgotPasswordResponse,
-    ResetPasswordRequest, ResetPasswordResponse,
-    ChangePasswordRequest, ChangePasswordResponse
-)
-
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password_api(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    from app.services.auth import forgot_password
-    return forgot_password(db, payload)
+    return forgot_password_service(db, payload)
+
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)
 def reset_password_api(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
-    from app.services.auth import reset_password
-    return reset_password(db, payload)
+    return reset_password_service(db, payload)
+
 
 @router.post("/change-password", response_model=ChangePasswordResponse)
-def change_password_api(payload: ChangePasswordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.services.auth import change_password
-    return change_password(db, current_user, payload)
+def change_password_api(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return change_password_service(db, current_user, payload)
