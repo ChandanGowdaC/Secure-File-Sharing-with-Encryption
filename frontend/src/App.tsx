@@ -9,7 +9,7 @@ import { LandingPage } from './pages/LandingPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
-import { api, getAuthToken, setAuthToken } from './api/client'
+import { api, setAuthToken } from './api/client'
 import { getStoredPrivateKey, clearStoredPrivateKey } from '../../crypto/src/keystore'
 
 interface NavigationProps {
