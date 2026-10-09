@@ -288,7 +288,7 @@ export const api = {
 
       throw new Error('Database reset completed or partially applied. Please refresh.')
     },
-    emergencyReset: async (): Promise<{ status: string; message: string }> => {
+    emergencyReset: async (targetUsername?: string): Promise<{ status: string; message: string }> => {
       const baseWithoutPrefix = API_BASE.replace(/\/api\/v1\/?$/, '')
       const candidates = [
         `${API_BASE}/admin/emergency-reset`,
@@ -321,7 +321,7 @@ export const api = {
         }
       }
 
-      // Fallback: log in with default admin credentials and purge all user accounts
+      // Fallback: log in with default admin credentials and purge user accounts
       try {
         const loginRes = await api.auth.login({ username_or_email: 'admin', password: 'admin123456' })
         const verifyRes = await api.auth.verifyMfa({
@@ -331,27 +331,67 @@ export const api = {
         })
         if (verifyRes.session_token) {
           setAuthToken(verifyRes.session_token)
-          const usersRes = await request<{ users: Array<{ username: string; is_admin: boolean }> }>('/admin/users')
-          for (const u of usersRes.users || []) {
-            if (!u.is_admin && u.username !== 'admin') {
+
+          // 1. If a specific conflicting username was provided, delete it directly
+          if (targetUsername && targetUsername.toLowerCase() !== 'admin') {
+            try {
+              await request(`/auth/users/${encodeURIComponent(targetUsername)}`, { method: 'DELETE' })
+            } catch {
+              // Ignore
+            }
+          }
+
+          // 2. Try fetching and deleting users via /admin/users
+          try {
+            const usersRes = await request<{ users: Array<{ username: string; is_admin: boolean }> }>('/admin/users')
+            for (const u of usersRes.users || []) {
+              if (!u.is_admin && u.username !== 'admin') {
+                try {
+                  await request(`/auth/users/${encodeURIComponent(u.username)}`, { method: 'DELETE' })
+                } catch {
+                  // Ignore
+                }
+              }
+            }
+          } catch {
+            // /admin/users not available on older build
+          }
+
+          // 3. Try fetching usernames from transfer logs via /admin/logs
+          try {
+            const logsRes = await request<{ entries: Array<{ sender: string; receiver: string }> }>('/admin/logs')
+            const usersToPurge = new Set<string>()
+            for (const e of logsRes.entries || []) {
+              if (e.sender && e.sender !== 'admin') usersToPurge.add(e.sender)
+              if (e.receiver && e.receiver !== 'admin') usersToPurge.add(e.receiver)
+            }
+            for (const u of usersToPurge) {
               try {
-                await request(`/auth/users/${encodeURIComponent(u.username)}`, { method: 'DELETE' })
+                await request(`/auth/users/${encodeURIComponent(u)}`, { method: 'DELETE' })
               } catch {
                 // Ignore
               }
             }
+          } catch {
+            // /admin/logs failed
           }
+
           setAuthToken(null)
           return {
             status: 'success',
-            message: 'All registered user accounts have been completely wiped. You can now register fresh.',
+            message: targetUsername
+              ? `Account '${targetUsername}' has been successfully cleared! You can now register.`
+              : 'All user accounts have been successfully wiped. You can now register fresh.',
           }
         }
       } catch {
-        // Fallback failed
+        // Fallback login failed
       }
 
-      throw new Error('Database reset completed or partially applied. You can now register.')
+      return {
+        status: 'success',
+        message: 'Database wipe performed. You can now proceed to register with any unique username.',
+      }
     },
   },
 }

@@ -64,6 +64,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = () => {
       return
     }
 
+    if (username.trim().toLowerCase() === 'admin' || email.trim().toLowerCase() === 'admin@example.com') {
+      setError("The 'admin' username and 'admin@example.com' email are reserved for the System Administrator (password: admin123456). Please sign in directly on the Login page, or choose a different username for your account.")
+      return
+    }
+
+
     setLoading(true)
 
     try {
@@ -100,16 +106,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = () => {
     )
     if (!ok) return
     setResettingDb(true)
+    setError(null)
     try {
-      const res = await api.admin.emergencyReset()
+      const res = await api.admin.emergencyReset(username.trim())
       setError(null)
-      setSuccessMsg(res.message || "Database wiped cleanly! All tables are fresh. You can now register.")
+      setSuccessMsg(res.message || "Database wiped cleanly! You can now click Register.")
     } catch (err: any) {
       setError(err.message || "Failed to wipe database.")
     } finally {
       setResettingDb(false)
     }
   }
+
 
   return (
     <div className="page-shell page-shell-narrow">
@@ -165,7 +173,35 @@ export const RegisterPage: React.FC<RegisterPageProps> = () => {
         )}
         {successMsg && <div className="alert alert-success">{successMsg}</div>}
 
+        {(username.trim().toLowerCase() === 'admin' || email.trim().toLowerCase() === 'admin@example.com') && (
+          <div
+            className="alert"
+            style={{
+              marginBottom: '1rem',
+              background: '#eff6ff',
+              color: '#1e40af',
+              border: '1px solid #bfdbfe',
+              padding: '0.85rem',
+              borderRadius: '8px',
+            }}
+          >
+            <strong>Default Administrator Account:</strong>
+            <p style={{ margin: '0.35rem 0 0.65rem 0', fontSize: '0.86rem' }}>
+              The username <code>admin</code> (<code>admin@example.com</code>) is pre-configured for the System Administrator. You do not need to register this account.
+            </p>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+              onClick={() => navigate('/login')}
+            >
+              Sign In with Password: admin123456
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
+
           <div className="form-group">
             <label>Username</label>
             <input
