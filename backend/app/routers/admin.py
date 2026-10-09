@@ -73,3 +73,21 @@ def get_user_activity_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=activity_log_{username}.pdf"},
     )
+
+
+@router.post("/reset-database")
+def reset_database(
+    admin_user: User = Depends(require_admin),
+) -> dict[str, str]:
+    """Wipe all database tables, users, transfers, and activity logs. Restores default admin."""
+    _ = admin_user
+    from app.db import reset_entire_system
+    return reset_entire_system()
+
+
+@router.post("/emergency-reset")
+def emergency_reset() -> dict[str, str]:
+    """Emergency system reset endpoint to wipe all database tables and restore default admin."""
+    from app.db import reset_entire_system
+    return reset_entire_system()
+

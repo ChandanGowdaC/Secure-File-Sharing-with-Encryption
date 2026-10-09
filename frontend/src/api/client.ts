@@ -224,5 +224,10 @@ export const api = {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     },
+    resetDatabase: () =>
+      request<{ status: string; message: string }>('/admin/reset-database', { method: 'POST' }),
+    emergencyReset: () =>
+      request<{ status: string; message: string }>('/admin/emergency-reset', { method: 'POST' }),
   },
 }
+

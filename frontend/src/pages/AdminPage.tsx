@@ -35,6 +35,37 @@ export const AdminPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'transfers' | 'users' | 'activities'>('users')
+  const [wipingDb, setWipingDb] = useState(false)
+  const [wipeNotice, setWipeNotice] = useState<string | null>(null)
+
+  const handleResetDatabase = async () => {
+    const confirmed = window.confirm(
+      "⚠️ DANGER: COMPLETE DATABASE WIPE\n\n" +
+      "This will permanently delete:\n" +
+      "• ALL registered users\n" +
+      "• ALL pending & completed file transfers\n" +
+      "• ALL user activity logs & forensic audits\n" +
+      "• ALL local encrypted blob files\n\n" +
+      "Only the default administrator ('admin' / 'admin123456') will remain.\n\n" +
+      "Are you sure you want to completely wipe everything?"
+    )
+    if (!confirmed) return
+
+    setWipingDb(true)
+    setError(null)
+    setWipeNotice(null)
+    try {
+      const res = await api.admin.resetDatabase()
+      setWipeNotice(res.message || 'Database wiped successfully! System reset to factory default.')
+      if (activeTab === 'users') fetchUsers()
+      else if (activeTab === 'activities') fetchActivities()
+      else fetchLogs()
+    } catch (err: any) {
+      setError(err.message || 'Failed to wipe database.')
+    } finally {
+      setWipingDb(false)
+    }
+  }
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -132,8 +163,9 @@ export const AdminPage: React.FC = () => {
       </section>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {wipeNotice && <div className="alert alert-success">{wipeNotice}</div>}
 
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button
           className={activeTab === 'users' ? 'btn-primary' : 'btn-secondary'}
           onClick={() => { setActiveTab('users'); setSearchQuery('') }}
@@ -166,7 +198,33 @@ export const AdminPage: React.FC = () => {
           </svg>
           Transfer Audit Logs
         </button>
+
+        <button
+          className="btn-danger"
+          style={{
+            marginLeft: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.55rem 1rem',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            borderRadius: '8px',
+          }}
+          onClick={handleResetDatabase}
+          disabled={wipingDb}
+          title="Permanently wipe all database tables, users, transfers, and audit logs"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
+          {wipingDb ? 'Wiping Database...' : 'Wipe All Tables & Reset DB'}
+        </button>
       </div>
+
 
       <section className="glass-card admin-panel">
         <div className="admin-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>

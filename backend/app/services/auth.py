@@ -54,9 +54,15 @@ def register_user(db: Session, payload: RegisterRequest) -> RegisterResponse:
         .first()
     )
     if existing_user:
+        if clean_username == settings.admin_username.lower() or clean_email == settings.admin_email.lower():
+            raise AppError(
+                f"The administrator account '{settings.admin_username}' ({settings.admin_email}) is pre-configured by default. "
+                f"You can sign in immediately with password '{settings.admin_password}', or choose a different username/email to create a new account.",
+                status_code=409,
+            )
         if existing_user.username.lower() == clean_username:
-            raise AppError("This username is already taken. Please choose another username.", status_code=409)
-        raise AppError("An account with this email address is already registered.", status_code=409)
+            raise AppError(f"Username '{payload.username}' is already taken. Please choose another username.", status_code=409)
+        raise AppError(f"Email '{payload.email}' is already registered. Please sign in or use another email.", status_code=409)
 
     mfa_secret = generate_mfa_secret()
     user = User(

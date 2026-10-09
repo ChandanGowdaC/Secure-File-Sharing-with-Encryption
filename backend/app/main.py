@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db import SessionLocal, init_db
+from app.db import SessionLocal, init_db, reset_entire_system
 from app.middleware.errors import register_exception_handlers
 from app.models import User
 from app.routers import admin, auth, transfers
@@ -14,36 +14,30 @@ from app.utils.security import hash_password
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Wipe database tables and local storage blobs on startup if reset is enabled
-    if settings.reset_database_on_startup and settings.storage_backend == "local":
-        import shutil
-        from pathlib import Path
-        blob_dir = Path(settings.local_blob_path)
-        if blob_dir.exists():
-            shutil.rmtree(blob_dir, ignore_errors=True)
-
-    init_db(reset=settings.reset_database_on_startup)
-    
-    # Seed admin user if not existing
-    db = SessionLocal()
-    try:
-        admin_user = db.query(User).filter(User.username == settings.admin_username).first()
-        if not admin_user:
-            admin_user = User(
-                username=settings.admin_username,
-                email=settings.admin_email,
-                hashed_password=hash_password(settings.admin_password),
-                long_term_public_key="SYSTEM_ADMIN_PUBKEY",
-                is_admin=True,
-            )
-            db.add(admin_user)
-            db.commit()
-        else:
-            admin_user.is_admin = True
-            admin_user.hashed_password = hash_password(settings.admin_password)
-            db.commit()
-    finally:
-        db.close()
+    # Fully wipe database tables, registered users, and blobs on startup/redeploy if reset is enabled
+    if settings.reset_database_on_startup:
+        reset_entire_system()
+    else:
+        init_db(reset=False)
+        db = SessionLocal()
+        try:
+            admin_user = db.query(User).filter(User.username == settings.admin_username).first()
+            if not admin_user:
+                admin_user = User(
+                    username=settings.admin_username,
+                    email=settings.admin_email,
+                    hashed_password=hash_password(settings.admin_password),
+                    long_term_public_key="SYSTEM_ADMIN_PUBKEY",
+                    is_admin=True,
+                )
+                db.add(admin_user)
+                db.commit()
+            else:
+                admin_user.is_admin = True
+                admin_user.hashed_password = hash_password(settings.admin_password)
+                db.commit()
+        finally:
+            db.close()
     yield
 
 

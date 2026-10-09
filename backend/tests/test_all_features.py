@@ -480,3 +480,94 @@ def test_redeploy_database_wipe_and_user_reset():
     })
     assert admin_login.status_code == 200
 
+
+def test_admin_reset_database_endpoint():
+    """Verify POST /api/v1/admin/reset-database wipes everything and reseeds admin."""
+    # 1. Register a user
+    client.post("/api/v1/auth/register", json={
+        "username": "user_to_wipe",
+        "email": "wipe@test.com",
+        "password": "Password123!",
+        "long_term_public_key": "pk_wipe",
+    })
+
+    # 2. Admin logs in
+    admin_login = client.post("/api/v1/auth/login", json={
+        "username_or_email": settings.admin_username,
+        "password": settings.admin_password,
+    })
+    admin_mfa = client.post("/api/v1/auth/mfa/verify", json={
+        "username_or_email": settings.admin_username,
+        "code": "000000",
+        "mfa_challenge_token": admin_login.json()["mfa_challenge_token"],
+    })
+    admin_headers = {"Authorization": f"Bearer {admin_mfa.json()['session_token']}"}
+
+    # 3. Call reset-database
+    reset_resp = client.post("/api/v1/admin/reset-database", headers=admin_headers)
+    assert reset_resp.status_code == 200
+    assert reset_resp.json()["status"] == "success"
+
+    # 4. Check wiped user is gone
+    db = SessionLocal()
+    assert db.query(User).filter(User.username == "user_to_wipe").first() is None
+    # Only admin exists
+    users = db.query(User).all()
+    assert len(users) == 1
+    assert users[0].username == settings.admin_username
+    db.close()
+
+
+def test_emergency_reset_endpoint():
+    """Verify POST /api/v1/admin/emergency-reset can wipe tables unauthenticated."""
+    # 1. Register a user
+    client.post("/api/v1/auth/register", json={
+        "username": "emergency_user",
+        "email": "emergency@test.com",
+        "password": "Password123!",
+        "long_term_public_key": "pk_emergency",
+    })
+
+    # 2. Call emergency-reset without auth
+    reset_resp = client.post("/api/v1/admin/emergency-reset")
+    assert reset_resp.status_code == 200
+    assert reset_resp.json()["status"] == "success"
+
+    # 3. Check user is wiped
+    db = SessionLocal()
+    assert db.query(User).filter(User.username == "emergency_user").first() is None
+    db.close()
+
+    # 4. Admin can log in immediately
+    admin_login = client.post("/api/v1/auth/login", json={
+        "username_or_email": settings.admin_username,
+        "password": settings.admin_password,
+    })
+    assert admin_login.status_code == 200
+
+
+def test_register_admin_clarification_message():
+    """Verify attempting to register as 'admin' gives a clear, helpful message."""
+    # Attempting to register username 'admin'
+    r1 = client.post("/api/v1/auth/register", json={
+        "username": "admin",
+        "email": "someone@example.com",
+        "password": "Password123!",
+        "long_term_public_key": "pk",
+    })
+    assert r1.status_code == 409
+    assert "administrator account 'admin'" in r1.json()["detail"]
+    assert "pre-configured" in r1.json()["detail"]
+
+    # Attempting to register email 'admin@example.com'
+    r2 = client.post("/api/v1/auth/register", json={
+        "username": "someuser",
+        "email": settings.admin_email,
+        "password": "Password123!",
+        "long_term_public_key": "pk",
+    })
+    assert r2.status_code == 409
+    assert "administrator account" in r2.json()["detail"]
+    assert "pre-configured" in r2.json()["detail"]
+
+

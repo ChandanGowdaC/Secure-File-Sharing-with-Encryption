@@ -21,13 +21,72 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def wipe_all_tables() -> None:
+    """Safely drop all existing database tables, disabling foreign key constraints."""
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    with engine.begin() as connection:
+        if db_url.startswith("sqlite"):
+            connection.execute(text("PRAGMA foreign_keys = OFF;"))
+            for table in existing_tables:
+                connection.execute(text(f'DROP TABLE IF EXISTS "{table}";'))
+            connection.execute(text("PRAGMA foreign_keys = ON;"))
+        elif "postgres" in db_url:
+            for table in existing_tables:
+                connection.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE;'))
+        else:
+            Base.metadata.drop_all(bind=connection)
+
+
 def init_db(reset: bool = False) -> None:
     if reset:
-        Base.metadata.drop_all(bind=engine)
+        wipe_all_tables()
     Base.metadata.create_all(bind=engine)
     _ensure_transfer_file_size_column()
     _ensure_user_last_login_column()
     _ensure_activity_logs_table()
+
+
+def reset_entire_system() -> dict[str, str]:
+    """Bulletproof reset: purges storage blobs, drops all tables, recreates schema, reseeds default admin."""
+    import shutil
+    from pathlib import Path
+
+    # 1. Purge storage blob directories
+    for path_str in [settings.local_blob_path, "storage/blobs", "/tmp/secure-file-blobs"]:
+        blob_path = Path(path_str)
+        try:
+            if blob_path.exists():
+                shutil.rmtree(blob_path, ignore_errors=True)
+            blob_path.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    # 2. Wipe and re-initialize all database tables
+    init_db(reset=True)
+
+    # 3. Seed clean default administrator
+    from app.models import User
+    from app.utils.security import hash_password
+
+    db = SessionLocal()
+    try:
+        admin_user = User(
+            username=settings.admin_username,
+            email=settings.admin_email,
+            hashed_password=hash_password(settings.admin_password),
+            long_term_public_key="SYSTEM_ADMIN_PUBKEY",
+            is_admin=True,
+        )
+        db.add(admin_user)
+        db.commit()
+    finally:
+        db.close()
+
+    return {
+        "status": "success",
+        "message": "All database tables, users, transfers, and logs have been completely wiped. Default administrator reseeded.",
+    }
 
 
 def _ensure_transfer_file_size_column() -> None:
