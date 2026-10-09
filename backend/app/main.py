@@ -14,7 +14,14 @@ from app.utils.security import hash_password
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB tables
+    # Wipe database tables and local storage blobs on startup if reset is enabled
+    if settings.reset_database_on_startup and settings.storage_backend == "local":
+        import shutil
+        from pathlib import Path
+        blob_dir = Path(settings.local_blob_path)
+        if blob_dir.exists():
+            shutil.rmtree(blob_dir, ignore_errors=True)
+
     init_db(reset=settings.reset_database_on_startup)
     
     # Seed admin user if not existing

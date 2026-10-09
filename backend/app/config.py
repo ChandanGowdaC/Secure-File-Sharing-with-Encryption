@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     database_url: str = "sqlite:///./secure_file_sharing.db"
-    # The deployment compose file enables this so each deployment starts with a clean database.
-    reset_database_on_startup: bool = False
+    # Automatically wipe database tables and users on every deployment startup
+    reset_database_on_startup: bool = True
 
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 60

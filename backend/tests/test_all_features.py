@@ -427,3 +427,56 @@ def test_account_deletion_and_forensic_preservation():
     pdf_resp = client.get("/api/v1/admin/activity-logs/delete_me/pdf", headers=admin_headers)
     assert pdf_resp.status_code == 200
     assert pdf_resp.content.startswith(b"%PDF-")
+
+
+def test_redeploy_database_wipe_and_user_reset():
+    """Verify that redeploy / startup database reset wipes all users and tables cleanly."""
+    # Register test user
+    client.post("/api/v1/auth/register", json={
+        "username": "temporary_user",
+        "email": "temp@test.com",
+        "password": "Password123!",
+        "long_term_public_key": "pk_temp",
+    })
+
+    # Verify user exists before reset
+    db = SessionLocal()
+    assert db.query(User).filter(User.username == "temporary_user").first() is not None
+    db.close()
+
+    # Simulate redeployment with reset_database_on_startup=True
+    init_db(reset=True)
+
+    # Re-seed admin user as done in lifespan
+    db = SessionLocal()
+    admin_user = User(
+        username=settings.admin_username,
+        email=settings.admin_email,
+        hashed_password=hash_password(settings.admin_password),
+        long_term_public_key="SYSTEM_ADMIN_PUBKEY",
+        is_admin=True,
+    )
+    db.add(admin_user)
+    db.commit()
+
+    # Verify all non-admin users have been wiped
+    assert db.query(User).filter(User.username == "temporary_user").first() is None
+    users = db.query(User).all()
+    assert len(users) == 1
+    assert users[0].username == settings.admin_username
+    db.close()
+
+    # Attempting to log in as wiped user fails
+    login_resp = client.post("/api/v1/auth/login", json={
+        "username_or_email": "temporary_user",
+        "password": "Password123!",
+    })
+    assert login_resp.status_code == 401
+
+    # Admin can still log in cleanly
+    admin_login = client.post("/api/v1/auth/login", json={
+        "username_or_email": settings.admin_username,
+        "password": settings.admin_password,
+    })
+    assert admin_login.status_code == 200
+
