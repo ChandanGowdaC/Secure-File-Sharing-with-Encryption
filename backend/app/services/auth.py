@@ -62,6 +62,9 @@ def register_user(db: Session, payload: RegisterRequest) -> RegisterResponse:
     db.commit()
     db.refresh(user)
 
+    from app.services.audit import log_activity
+    log_activity(db, user.id, user.username, "register")
+
     return RegisterResponse(
         message="Registration successful. Proceed to login.",
         username=user.username,
@@ -81,6 +84,13 @@ def login_user(db: Session, payload: LoginRequest) -> LoginResponse:
     )
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise AppError("Invalid credentials.", status_code=401)
+
+    from datetime import datetime, timezone
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+
+    from app.services.audit import log_activity
+    log_activity(db, user.id, user.username, "login")
 
     # Generate 6-digit Email OTP and send to registered address
     email_otp = generate_email_otp()
@@ -188,5 +198,62 @@ def delete_account(
         )
         db.query(Transfer).filter(Transfer.id.in_(transfer_ids)).delete(synchronize_session=False)
 
+    from app.services.audit import log_activity
+    log_activity(db, user.id, user.username, "delete_account")
+    from app.models import ActivityLog
+    db.query(ActivityLog).filter(ActivityLog.user_id == user.id).update({ActivityLog.user_id: None})
+
     db.delete(user)
     db.commit()
+
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse
+)
+from app.utils.security import create_password_reset_token, decode_token
+from app.config import settings
+
+def forgot_password(db: Session, payload: ForgotPasswordRequest) -> ForgotPasswordResponse:
+    user = db.query(User).filter(func.lower(User.email) == payload.email.strip().lower()).first()
+    if user:
+        token = create_password_reset_token(user.id, user.username, user.email)
+        from app.services.email import send_password_reset_email
+        reset_link = f"{settings.frontend_url}/reset-password?token={token}"
+        send_password_reset_email(user.email, user.username, reset_link)
+        from app.services.audit import log_activity
+        log_activity(db, user.id, user.username, "password_reset_requested")
+    
+    return ForgotPasswordResponse(message="If an account with that email exists, we have sent a password reset link.")
+
+def reset_password(db: Session, payload: ResetPasswordRequest) -> ResetPasswordResponse:
+    token_payload = decode_token(payload.token)
+    if not token_payload or token_payload.get("type") != "password_reset":
+        raise AppError("Invalid or expired password reset token.", status_code=400)
+        
+    user = db.get(User, int(token_payload["sub"]))
+    if not user:
+        raise AppError("User not found.", status_code=404)
+        
+    user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    
+    from app.services.audit import log_activity
+    log_activity(db, user.id, user.username, "password_reset")
+    
+    return ResetPasswordResponse(message="Password successfully reset.")
+
+def change_password(db: Session, user: User, payload: ChangePasswordRequest) -> ChangePasswordResponse:
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise AppError("Invalid current password.", status_code=400)
+        
+    user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    
+    from app.services.audit import log_activity
+    log_activity(db, user.id, user.username, "password_change")
+    
+    return ChangePasswordResponse(message="Password successfully changed.")

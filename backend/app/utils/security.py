@@ -58,6 +58,13 @@ def create_token(data: Dict[str, Any], expires_delta: timedelta) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
+def create_password_reset_token(user_id: int, username: str, email: str) -> str:
+    return create_token(
+        {"sub": str(user_id), "username": username, "email": email, "type": "password_reset"},
+        timedelta(minutes=settings.password_reset_expire_minutes),
+    )
+
+
 def create_session_token(user_id: int, username: str, is_admin: bool = False) -> str:
     return create_token(
         {"sub": str(user_id), "username": username, "is_admin": is_admin, "type": "session"},

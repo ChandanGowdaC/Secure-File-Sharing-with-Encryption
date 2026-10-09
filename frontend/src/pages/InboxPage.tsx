@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { getStoredPrivateKey } from '../../../crypto/src/keystore'
 import { deriveTransferKey } from '../../../crypto/src/hkdf'
@@ -19,7 +19,7 @@ function formatFileSize(bytes?: number | null) {
   return `${bytes} B`
 }
 
-export default function InboxPage() {
+export const InboxPage: React.FC = () => {
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransferItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [activeTransferId, setActiveTransferId] = useState<string | null>(null)
@@ -112,67 +112,75 @@ export default function InboxPage() {
   }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '2rem auto' }} className="glass-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div>
-          <h2>Inbox & Pending Transfers</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Delivered files are decrypted in browser memory and immediately purged from server storage.
-          </p>
+    <div className="page-shell">
+      <div className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <h2>Inbox & Pending Transfers</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              Delivered files are decrypted in browser memory and immediately purged from server storage.
+            </p>
+          </div>
+          <button onClick={fetchPending} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '6px' }}><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            Refresh
+          </button>
         </div>
-        <button onClick={fetchPending} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
-          🔄 Refresh
-        </button>
-      </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-      {statusMsg && <div className="alert alert-success">{statusMsg}</div>}
+        {error && <div className="alert alert-error">{error}</div>}
+        {statusMsg && <div className="alert alert-success">{statusMsg}</div>}
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-          Loading pending transfers...
-        </div>
-      ) : pendingTransfers.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-          📭 No pending files queued for delivery.
-        </div>
-      ) : (
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Sender</th>
-                <th>Transfer ID</th>
-                <th>File Size</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingTransfers.map(item => (
-                <tr key={item.transfer_id}>
-                  <td><strong>👤 {item.sender}</strong></td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{item.transfer_id.slice(0, 18)}...</td>
-                  <td>{formatFileSize(item.file_size_bytes)}</td>
-                  <td>
-                    <span className="badge badge-pending">{item.status}</span>
-                  </td>
-                  <td>
-                    <button
-                      className="btn-primary"
-                      style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-                      disabled={activeTransferId === item.transfer_id}
-                      onClick={() => handleDecryptAndDownload(item.transfer_id)}
-                    >
-                      {activeTransferId === item.transfer_id ? 'Decrypting...' : '🔒 Decrypt & Download Both'}
-                    </button>
-                  </td>
+        {loading ? (
+          <div className="empty-state">
+            Loading pending transfers...
+          </div>
+        ) : pendingTransfers.length === 0 ? (
+          <div className="empty-state">
+            No pending files queued for delivery.
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sender</th>
+                  <th>Transfer ID</th>
+                  <th>File Size</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {pendingTransfers.map(item => (
+                  <tr key={item.transfer_id}>
+                    <td><strong>{item.sender}</strong></td>
+                    <td className="mono-cell">{item.transfer_id.slice(0, 18)}...</td>
+                    <td>{formatFileSize(item.file_size_bytes)}</td>
+                    <td>
+                      <span className="badge badge-pending">{item.status}</span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn-primary"
+                        style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
+                        disabled={activeTransferId === item.transfer_id}
+                        onClick={() => handleDecryptAndDownload(item.transfer_id)}
+                      >
+                        {activeTransferId === item.transfer_id ? 'Decrypting...' : (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Decrypt & Download Both
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

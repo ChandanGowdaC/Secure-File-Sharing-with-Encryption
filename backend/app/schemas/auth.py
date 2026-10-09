@@ -44,3 +44,24 @@ class PublicKeyLookupResponse(BaseModel):
     username: Optional[str] = None
     public_key: Optional[str] = None
     message: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+class ChangePasswordResponse(BaseModel):
+    message: str

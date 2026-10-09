@@ -99,6 +99,9 @@ def upload_transfer(
     log_event(db, transfer, "queued")
     log_event(db, transfer, "upload")
 
+    from app.services.audit import log_activity
+    log_activity(db, sender.id, sender.username, "upload_file", details=f"To: {receiver.username}, Size: {file_size_bytes}")
+
     return UploadTransferResponse(
         transfer_id=transfer_id,
         status=TransferStatus.pending,
@@ -227,6 +230,9 @@ def acknowledge_download(db: Session, receiver: User, transfer_id: str, success:
     transfer.status = TransferStatus.downloaded.value
     db.commit()
     log_event(db, transfer, "downloaded")
+
+    from app.services.audit import log_activity
+    log_activity(db, receiver.id, receiver.username, "download_file", details=f"From transfer {transfer_id}")
 
 
 def deliver_all_pending(db: Session, receiver: User) -> List[DeliverTransferResponse]:

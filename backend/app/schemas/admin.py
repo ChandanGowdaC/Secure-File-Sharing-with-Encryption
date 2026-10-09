@@ -23,3 +23,25 @@ class TransferLogEntry(BaseModel):
 
 class TransferLogResponse(BaseModel):
     entries: List[TransferLogEntry]
+
+
+class ActivityLogEntry(BaseModel):
+    id: int
+    username: str
+    action: str
+    details: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: datetime
+
+class ActivityLogResponse(BaseModel):
+    entries: List[ActivityLogEntry]
+
+class UserInfoEntry(BaseModel):
+    username: str
+    email: str
+    is_admin: bool
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+
+class UsersListResponse(BaseModel):
+    users: List[UserInfoEntry]

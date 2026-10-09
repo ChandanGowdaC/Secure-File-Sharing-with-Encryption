@@ -27,6 +27,8 @@ def init_db(reset: bool = False) -> None:
         Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     _ensure_transfer_file_size_column()
+    _ensure_user_last_login_column()
+    _ensure_activity_logs_table()
 
 
 def _ensure_transfer_file_size_column() -> None:
@@ -39,6 +41,22 @@ def _ensure_transfer_file_size_column() -> None:
     column_type = "INTEGER" if db_url.startswith("sqlite") else "INT"
     with engine.begin() as connection:
         connection.execute(text(f"ALTER TABLE transfers ADD COLUMN file_size_bytes {column_type}"))
+
+def _ensure_user_last_login_column() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    if "last_login_at" in columns:
+        return
+    column_type = "DATETIME" if db_url.startswith("sqlite") else "TIMESTAMP"
+    with engine.begin() as connection:
+        connection.execute(text(f"ALTER TABLE users ADD COLUMN last_login_at {column_type}"))
+
+def _ensure_activity_logs_table() -> None:
+    inspector = inspect(engine)
+    if "activity_logs" not in inspector.get_table_names():
+        Base.metadata.tables["activity_logs"].create(bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:

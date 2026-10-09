@@ -86,3 +86,24 @@ def delete_account(
         
     delete_account_service(db, user_to_delete)
 
+
+from app.schemas.auth import (
+    ForgotPasswordRequest, ForgotPasswordResponse,
+    ResetPasswordRequest, ResetPasswordResponse,
+    ChangePasswordRequest, ChangePasswordResponse
+)
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password_api(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    from app.services.auth import forgot_password
+    return forgot_password(db, payload)
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+def reset_password_api(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    from app.services.auth import reset_password
+    return reset_password(db, payload)
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+def change_password_api(payload: ChangePasswordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.services.auth import change_password
+    return change_password(db, current_user, payload)

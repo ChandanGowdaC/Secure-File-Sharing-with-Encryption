@@ -56,6 +56,9 @@ export const api = {
     login: (body: unknown) => request<{ mfa_required: boolean; mfa_challenge_token?: string; session_token?: string; message: string; is_admin?: boolean; masked_email?: string; username?: string }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
     verifyMfa: (body: unknown) => request<{ mfa_required: boolean; session_token?: string; message: string; is_admin?: boolean; username?: string }>('/auth/mfa/verify', { method: 'POST', body: JSON.stringify(body) }),
     deleteAccount: () => request<void>('/auth/me', { method: 'DELETE' }),
+    forgotPassword: (body: { email: string }) => request<{ message: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
+    resetPassword: (body: { token: string; new_password: string }) => request<{ message: string }>('/auth/reset-password', { method: 'POST', body: JSON.stringify(body) }),
+    changePassword: (body: { current_password: string; new_password: string }) => request<{ message: string }>('/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
     lookupPublicKey: (params: { username?: string; email?: string }) => {
       const query = new URLSearchParams()
       if (params.username) query.set('username', params.username)
@@ -75,5 +78,8 @@ export const api = {
   },
   admin: {
     logs: () => request<{ entries: Array<{ transfer_id: string; sender: string; receiver: string; timestamp: string; status: string }> }>('/admin/logs'),
+    activityLogs: (username?: string) => request<{ entries: Array<any> }>('/admin/activity-logs' + (username ? '?username=' + username : '')),
+    users: () => request<{ users: Array<any> }>('/admin/users'),
+    generatePdf: async (username: string) => { const token = getAuthToken(); const response = await fetch(API_BASE + '/admin/activity-logs/' + username + '/pdf', { headers: { Authorization: 'Bearer ' + token } }); if (!response.ok) throw new Error('PDF generation failed'); const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = username + '_activity_log.pdf'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
   },
 }

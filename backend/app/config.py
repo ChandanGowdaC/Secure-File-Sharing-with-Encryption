@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 60
     mfa_challenge_expire_minutes: int = 5
+    password_reset_expire_minutes: int = 30
+    frontend_url: str = "http://localhost:5173"
 
     # Object storage – encrypted blobs never live in the repo tree
     # Use "s3" with MinIO locally or AWS S3 in production; "local" is dev-only fallback

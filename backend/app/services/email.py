@@ -187,3 +187,47 @@ def send_mfa_email(to_email: str, username: str, otp_code: str) -> bool:
 
     logger.info("ℹ️ [EMAIL SERVICE] No email provider configured. Verification OTP logged to console above.")
     return True
+
+def send_password_reset_email(to_email: str, username: str, reset_link: str) -> bool:
+    subject = f"Password Reset Request - {settings.app_name}"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafb; color: #1e293b; padding: 20px; }
+            .card { max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+            .header { font-size: 20px; font-weight: bold; color: #4338ca; margin-bottom: 15px; text-align: center; }
+            .button { background: #4f46e5; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; margin: 20px 0; }
+            .footer { font-size: 12px; color: #64748b; text-align: center; margin-top: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="header">🛡️ {settings.app_name}</div>
+            <p>Hello <strong>{username}</strong>,</p>
+            <p>You requested a password reset. Click the button below to set a new password:</p>
+            
+            <div style="text-align: center;">
+                <a href="{reset_link}" class="button">Reset Password</a>
+            </div>
+            
+            <p>This link will expire in <strong>{settings.password_reset_expire_minutes} minutes</strong>. If you did not request this, please ignore this email.</p>
+            <div class="footer">&copy; {settings.app_name} • End-to-End Encrypted File Sharing</div>
+        </div>
+    </body>
+    </html>
+    """
+
+    if settings.brevo_api_key:
+        return _send_via_brevo(to_email, username, subject, html_content, "")
+
+    if settings.resend_api_key:
+        return _send_via_resend(to_email, username, subject, html_content, "")
+
+    if settings.smtp_host and settings.smtp_user and settings.smtp_password:
+        return _send_via_smtp(to_email, username, subject, html_content, reset_link)
+
+    logger.info(f"ℹ️ [EMAIL SERVICE] Password reset link for {to_email}: {reset_link}")
+    return True

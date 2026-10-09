@@ -23,11 +23,27 @@ class User(Base):
     long_term_public_key: Mapped[str] = mapped_column(Text)
     is_admin: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     sent_transfers: Mapped[list["Transfer"]] = relationship(back_populates="sender", foreign_keys="Transfer.sender_id")
     received_transfers: Mapped[list["Transfer"]] = relationship(
         back_populates="receiver", foreign_keys="Transfer.receiver_id"
     )
+    activity_logs: Mapped[list["ActivityLog"]] = relationship(foreign_keys="ActivityLog.user_id")
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    username: Mapped[str] = mapped_column(String(64), index=True)
+    action: Mapped[str] = mapped_column(String(128))
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
+    user: Mapped["User | None"] = relationship(foreign_keys=[user_id])
 
 
 class Transfer(Base):

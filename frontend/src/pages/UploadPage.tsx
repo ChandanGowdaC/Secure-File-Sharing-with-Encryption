@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { api } from '../api/client'
 import { generateEphemeralKeyPair } from '../../../crypto/src/keypair'
 import { deriveTransferKey } from '../../../crypto/src/hkdf'
@@ -17,7 +17,7 @@ function formatFileSize(bytes: number) {
   return `${bytes} B`
 }
 
-export default function UploadPage() {
+export const UploadPage: React.FC = () => {
   const [receiverUsername, setReceiverUsername] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
@@ -33,7 +33,7 @@ export default function UploadPage() {
       if (!extension || !SUPPORTED_EXTENSIONS.includes(extension)) {
         setFile(null)
         e.target.value = ''
-        setError(`“${selectedFile.name}” is not supported. Choose a ${SUPPORTED_FORMATS_LABEL} file.`)
+        setError(`'${selectedFile.name}' is not supported. Choose a ${SUPPORTED_FORMATS_LABEL} file.`)
         return
       }
       if (selectedFile.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -55,7 +55,7 @@ export default function UploadPage() {
     }
     const extension = file.name.split('.').pop()?.toLowerCase()
     if (!extension || !SUPPORTED_EXTENSIONS.includes(extension)) {
-      setError(`“${file.name}” is not supported. Choose a ${SUPPORTED_FORMATS_LABEL} file.`)
+      setError(`'${file.name}' is not supported. Choose a ${SUPPORTED_FORMATS_LABEL} file.`)
       return
     }
 
@@ -163,7 +163,9 @@ export default function UploadPage() {
 
           <div className="supported-files" aria-label="Supported file types">
             <div className="supported-files-heading">
-              <span className="supported-files-icon" aria-hidden="true">✓</span>
+              <span className="supported-files-icon" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
               <div>
                 <strong>Supported file types</strong>
                 <p>Choose a document, spreadsheet, presentation, image, or text file.</p>
