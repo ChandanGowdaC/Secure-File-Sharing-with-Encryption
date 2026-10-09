@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { api, setAuthToken } from '../api/client'
 
@@ -10,14 +10,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', ''])
+  const [mfaCode, setMfaCode] = useState('')
   const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null)
   const [mfaNotice, setMfaNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const otpInputsRef = useRef<(HTMLInputElement | null)[]>([])
+  const otpInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (mfaChallengeToken && otpInputRef.current) {
+      otpInputRef.current.focus()
+    }
+  }, [mfaChallengeToken])
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,16 +38,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
       if (res.mfa_required && res.mfa_challenge_token) {
         setMfaChallengeToken(res.mfa_challenge_token)
-        setOtpDigits(['', '', '', '', '', ''])
+        setMfaCode('')
         setMfaNotice(
           res.message ||
             (res.masked_email
               ? `A 6-digit code has been sent to ${res.masked_email}`
               : 'Verification code sent to your registered email.')
         )
-        setTimeout(() => {
-          otpInputsRef.current[0]?.focus()
-        }, 100)
       } else if (res.session_token) {
         setAuthToken(res.session_token)
         const loggedUsername = res.username || usernameOrEmail.trim()
@@ -55,64 +58,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   }
 
-  const handleOtpChange = (index: number, value: string) => {
-    const digit = value.replace(/\D/g, '').slice(-1)
-    const newDigits = [...otpDigits]
-    newDigits[index] = digit
-    setOtpDigits(newDigits)
-
-    if (digit && index < 5) {
-      otpInputsRef.current[index + 1]?.focus()
-    }
-  }
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      if (!otpDigits[index] && index > 0) {
-        const newDigits = [...otpDigits]
-        newDigits[index - 1] = ''
-        setOtpDigits(newDigits)
-        otpInputsRef.current[index - 1]?.focus()
-      } else {
-        const newDigits = [...otpDigits]
-        newDigits[index] = ''
-        setOtpDigits(newDigits)
-      }
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      otpInputsRef.current[index - 1]?.focus()
-    } else if (e.key === 'ArrowRight' && index < 5) {
-      otpInputsRef.current[index + 1]?.focus()
-    }
-  }
-
-  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault()
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (!pastedData) return
-
-    const newDigits = [...otpDigits]
-    for (let i = 0; i < 6; i++) {
-      newDigits[i] = pastedData[i] || ''
-    }
-    setOtpDigits(newDigits)
-
-    const nextIndex = Math.min(pastedData.length, 5)
-    otpInputsRef.current[nextIndex]?.focus()
-  }
-
-  const handleAutofillMasterCode = (code: string = '000000') => {
-    const digits = code.split('').slice(0, 6)
-    setOtpDigits(digits)
-    setError(null)
-    otpInputsRef.current[5]?.focus()
-  }
-
   const handleMfaSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!mfaChallengeToken) return
-    const code = otpDigits.join('')
-    if (code.length < 6) {
-      setError('Please enter all 6 digits of the verification code.')
+
+    const trimmedCode = mfaCode.trim()
+    if (trimmedCode.length < 6) {
+      setError('Please enter the 6-digit verification code.')
       return
     }
 
@@ -122,7 +74,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     try {
       const res = await api.auth.verifyMfa({
         username_or_email: usernameOrEmail.trim(),
-        code,
+        code: trimmedCode,
         mfa_challenge_token: mfaChallengeToken,
       })
 
@@ -138,6 +90,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       setError(err.message || 'Invalid or expired 6-digit code')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      const digits = text.replace(/\D/g, '').slice(0, 6)
+      if (digits) {
+        setMfaCode(digits)
+        setError(null)
+        otpInputRef.current?.focus()
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -158,96 +124,75 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         {mfaChallengeToken ? (
           <form onSubmit={handleMfaSubmit}>
-            {/* Master Code Highlight Banner */}
-            <div
-              style={{
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '12px',
-                padding: '0.9rem 1rem',
-                marginBottom: '1.5rem',
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#166534', fontWeight: 600, fontSize: '0.88rem' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  <path d="m9 12 2 2 4-4" />
-                </svg>
-                Master Bypass Code: <code style={{ background: '#dcfce7', padding: '2px 6px', borderRadius: '4px', fontSize: '0.95rem' }}>000000</code> or <code style={{ background: '#dcfce7', padding: '2px 6px', borderRadius: '4px', fontSize: '0.95rem' }}>123456</code>
-              </div>
-              <p style={{ color: '#15803d', fontSize: '0.8rem', margin: '0.35rem 0 0.65rem 0' }}>
-                For quick evaluation and testing without external email access.
-              </p>
-              <button
-                type="button"
-                onClick={() => handleAutofillMasterCode('000000')}
-                className="btn-secondary"
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '0.35rem 0.8rem',
-                  borderColor: '#86efac',
-                  background: '#ffffff',
-                  color: '#166534',
-                }}
-              >
-                Autofill Master Code (000000)
-              </button>
-            </div>
-
             <div className="form-group" style={{ textAlign: 'center' }}>
-              <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600 }}>
-                Enter 6-Digit Verification Code
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                6-Digit Verification Code
               </label>
 
-              {/* Segmented 6-box OTP UI */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  margin: '0.5rem 0 1.25rem 0',
-                }}
-              >
-                {otpDigits.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={el => {
-                      otpInputsRef.current[index] = el
-                    }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={e => handleOtpChange(index, e.target.value)}
-                    onKeyDown={e => handleOtpKeyDown(index, e)}
-                    onPaste={handleOtpPaste}
-                    style={{
-                      width: '46px',
-                      height: '54px',
-                      borderRadius: '10px',
-                      border: digit ? '2px solid var(--primary-accent)' : '1.5px solid var(--border-color)',
-                      textAlign: 'center',
-                      fontSize: '1.5rem',
-                      fontWeight: 700,
-                      color: 'var(--text-main)',
-                      background: '#ffffff',
-                      boxShadow: digit ? '0 0 0 3px rgba(91, 141, 239, 0.15)' : 'none',
-                      outline: 'none',
-                      transition: 'all 0.15s ease-in-out',
-                    }}
-                  />
-                ))}
+              <div style={{ position: 'relative', maxWidth: '300px', margin: '0.5rem auto 1rem auto' }}>
+                <input
+                  ref={otpInputRef}
+                  type="text"
+                  required
+                  autoFocus
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={mfaCode}
+                  onChange={e => {
+                    const cleaned = e.target.value.replace(/\D/g, '').slice(0, 6)
+                    setMfaCode(cleaned)
+                    if (error) setError(null)
+                  }}
+                  className="form-control"
+                  placeholder="000000"
+                  style={{
+                    letterSpacing: '0.5rem',
+                    textAlign: 'center',
+                    fontSize: '1.8rem',
+                    fontWeight: 700,
+                    height: '56px',
+                    borderRadius: '12px',
+                    borderColor: mfaCode.length === 6 ? 'var(--primary-accent)' : '#cbd5e1',
+                    background: '#ffffff',
+                    boxShadow: mfaCode.length === 6 ? '0 0 0 3px rgba(91, 141, 239, 0.2)' : 'none',
+                    paddingLeft: '0.5rem',
+                  }}
+                />
               </div>
 
-              <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>
-                Enter the code sent to your registered email or use the master code above.
+              {/* Quick Fill & Paste Helpers */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMfaCode('000000')
+                    setError(null)
+                    otpInputRef.current?.focus()
+                  }}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', borderRadius: '8px' }}
+                >
+                  Quick Fill: 000000
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePasteClipboard}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', borderRadius: '8px' }}
+                >
+                  Paste from Clipboard
+                </button>
+              </div>
+
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                Enter the code sent to your email or click Quick Fill above.
               </small>
             </div>
 
             <button
               type="submit"
-              disabled={loading || otpDigits.join('').length < 6}
+              disabled={loading || mfaCode.length < 6}
               className="btn-primary btn-full"
               style={{ marginTop: '1rem' }}
             >
@@ -261,7 +206,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               onClick={() => {
                 setMfaChallengeToken(null)
                 setMfaNotice(null)
-                setOtpDigits(['', '', '', '', '', ''])
+                setMfaCode('')
               }}
             >
               Back to Login
