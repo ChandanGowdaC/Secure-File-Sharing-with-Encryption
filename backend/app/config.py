@@ -13,12 +13,14 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     database_url: str = "sqlite:///./secure_file_sharing.db"
-    # The deployment compose file enables this so each deployment starts with a clean database.
-    reset_database_on_startup: bool = False
+    # Automatically wipe database tables and users on every deployment startup
+    reset_database_on_startup: bool = True
 
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 60
     mfa_challenge_expire_minutes: int = 5
+    password_reset_expire_minutes: int = 30
+    frontend_url: str = "https://secure-file-sharing-with-encryption-tau.vercel.app"
 
     # Object storage – encrypted blobs never live in the repo tree
     # Use "s3" with MinIO locally or AWS S3 in production; "local" is dev-only fallback
@@ -32,24 +34,25 @@ class Settings(BaseSettings):
     local_blob_path: str = "/tmp/secure-file-blobs"
     max_upload_size_bytes: int = 100 * 1024 * 1024
 
-    cors_origins: List[str] = ["http://localhost:5173"]
+    cors_origins: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"]
 
     admin_username: str = "admin"
     admin_password: str = "admin123456"
     admin_email: str = "admin@example.com"
 
     # SMTP Configuration for Email 2FA
-    smtp_host: Optional[str] = None
+    smtp_host: Optional[str] = "smtp.gmail.com"
     smtp_port: int = 587
-    smtp_user: Optional[str] = None
+    smtp_user: Optional[str] = "securefilesharing303.project@gmail.com"
     smtp_password: Optional[str] = None
-    smtp_from: Optional[str] = None
+    smtp_from: Optional[str] = "securefilesharing303.project@gmail.com"
     smtp_tls: bool = True
 
     # HTTP Email API (Port 443 - Recommended on Render/Vercel free tier)
     resend_api_key: Optional[str] = None
     resend_from: Optional[str] = "onboarding@resend.dev"
     brevo_api_key: Optional[str] = None
+    brevo_sender_email: Optional[str] = "securefilesharing303.project@gmail.com"
 
 
 settings = Settings()

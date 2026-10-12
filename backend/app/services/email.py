@@ -30,7 +30,12 @@ def mask_email(email: str) -> str:
 def _send_via_brevo(to_email: str, username: str, subject: str, html_content: str, otp_code: str) -> bool:
     """Send email via Brevo HTTPS REST API (Port 443 - not blocked on Render)."""
     try:
-        sender_email = settings.smtp_from or settings.smtp_user or "noreply@secureshare.app"
+        sender_email = (
+            getattr(settings, "brevo_sender_email", None)
+            or settings.smtp_from
+            or settings.smtp_user
+            or "securefilesharing303.project@gmail.com"
+        )
         payload = {
             "sender": {"name": settings.app_name, "email": sender_email},
             "to": [{"email": to_email, "name": username}],
@@ -50,7 +55,7 @@ def _send_via_brevo(to_email: str, username: str, subject: str, html_content: st
         with urllib.request.urlopen(req, timeout=10) as resp:
             resp_body = resp.read().decode("utf-8")
             if resp.status in (200, 201, 202):
-                logger.info(f"✅ [EMAIL SERVICE] 2FA OTP queued for {to_email} via Brevo HTTP API. Response: {resp_body}")
+                logger.info(f"✅ [EMAIL SERVICE] 2FA OTP queued for {to_email} via Brevo HTTP API (Sender: {sender_email}). Response: {resp_body}")
                 return True
             logger.warning(f"⚠️ [EMAIL SERVICE] Brevo HTTP response: {resp.status} - {resp_body}")
             return False
@@ -91,7 +96,12 @@ def _send_via_resend(to_email: str, username: str, subject: str, html_content: s
 
 def _send_via_smtp(to_email: str, username: str, subject: str, html_content: str, otp_code: str) -> bool:
     """Send email via standard SMTP (Ports 587/465). Note: Render Free Tier blocks outbound SMTP."""
-    sender = settings.smtp_from or settings.smtp_user or "noreply@secureshare.app"
+    sender = (
+        settings.smtp_from
+        or settings.smtp_user
+        or getattr(settings, "brevo_sender_email", None)
+        or "securefilesharing303.project@gmail.com"
+    )
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = sender
@@ -186,4 +196,48 @@ def send_mfa_email(to_email: str, username: str, otp_code: str) -> bool:
         return _send_via_smtp(to_email, username, subject, html_content, otp_code)
 
     logger.info("ℹ️ [EMAIL SERVICE] No email provider configured. Verification OTP logged to console above.")
+    return True
+
+def send_password_reset_email(to_email: str, username: str, reset_link: str) -> bool:
+    subject = f"Password Reset Request - {settings.app_name}"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafb; color: #1e293b; padding: 20px; }}
+            .card {{ max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
+            .header {{ font-size: 20px; font-weight: bold; color: #4338ca; margin-bottom: 15px; text-align: center; }}
+            .button {{ background: #4f46e5; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; margin: 20px 0; }}
+            .footer {{ font-size: 12px; color: #64748b; text-align: center; margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="header">🛡️ {settings.app_name}</div>
+            <p>Hello <strong>{username}</strong>,</p>
+            <p>You requested a password reset. Click the button below to set a new password:</p>
+            
+            <div style="text-align: center;">
+                <a href="{reset_link}" class="button">Reset Password</a>
+            </div>
+            
+            <p>This link will expire in <strong>{settings.password_reset_expire_minutes} minutes</strong>. If you did not request this, please ignore this email.</p>
+            <div class="footer">&copy; {settings.app_name} • End-to-End Encrypted File Sharing</div>
+        </div>
+    </body>
+    </html>
+    """
+
+    if settings.brevo_api_key:
+        return _send_via_brevo(to_email, username, subject, html_content, "")
+
+    if settings.resend_api_key:
+        return _send_via_resend(to_email, username, subject, html_content, "")
+
+    if settings.smtp_host and settings.smtp_user and settings.smtp_password:
+        return _send_via_smtp(to_email, username, subject, html_content, reset_link)
+
+    logger.info(f"ℹ️ [EMAIL SERVICE] Password reset link for {to_email}: {reset_link}")
     return True

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
@@ -30,6 +31,16 @@ class LoginResponse(BaseModel):
     is_admin: bool = False
     masked_email: Optional[str] = None
     username: Optional[str] = None
+    last_login_at: Optional[datetime] = None
+
+
+class UserMeResponse(BaseModel):
+    username: str
+    email: str
+    is_admin: bool
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+
 
 
 class MfaVerifyRequest(BaseModel):
@@ -38,9 +49,35 @@ class MfaVerifyRequest(BaseModel):
     mfa_challenge_token: Optional[str] = None
 
 
+class MfaResendRequest(BaseModel):
+    mfa_challenge_token: str
+    username_or_email: Optional[str] = None
+
+
 
 class PublicKeyLookupResponse(BaseModel):
     found: bool
     username: Optional[str] = None
     public_key: Optional[str] = None
     message: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+class ChangePasswordResponse(BaseModel):
+    message: str
