@@ -239,7 +239,7 @@ export const api = {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
     },
     resetDatabase: async (): Promise<{ status: string; message: string }> => {
       const baseWithoutPrefix = API_BASE.replace(/\/api\/v1\/?$/, '')

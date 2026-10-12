@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import { getStoredPrivateKey } from '../../../crypto/src/keystore'
-import { deriveTransferKey } from '../../../crypto/src/hkdf'
-import { decryptFile } from '../../../crypto/src/aes-gcm'
+import { getStoredPrivateKey } from '../crypto/keystore'
+import { deriveTransferKey } from '../crypto/hkdf'
+import { decryptFile } from '../crypto/aes-gcm'
 
 interface PendingTransferItem {
   transfer_id: string
@@ -25,9 +26,32 @@ export const InboxPage: React.FC = () => {
   const [activeTransferId, setActiveTransferId] = useState<string | null>(null)
   const [activeAction, setActiveAction] = useState<'decrypt' | 'bin' | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
-  const [downloadTracker, setDownloadTracker] = useState<Record<string, { decrypted?: boolean; encrypted?: boolean }>>({})
+  const [downloadTracker, setDownloadTracker] = useState<Record<string, { decrypted?: boolean; encrypted?: boolean }>>(() => {
+    try {
+      const saved = localStorage.getItem('sfs_download_tracker')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const updateDownloadTracker = (transferId: string, patch: { decrypted?: boolean; encrypted?: boolean }) => {
+    setDownloadTracker(prev => {
+      const current = prev[transferId] || {}
+      const updated = {
+        ...prev,
+        [transferId]: { ...current, ...patch },
+      }
+      try {
+        localStorage.setItem('sfs_download_tracker', JSON.stringify(updated))
+      } catch {
+        // ignore
+      }
+      return updated
+    })
+  }
 
   const fetchPending = async () => {
     setLoading(true)
@@ -53,7 +77,9 @@ export const InboxPage: React.FC = () => {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 10000)
   }
 
   const handleDecryptAndDownload = async (transferId: string) => {
@@ -89,10 +115,7 @@ export const InboxPage: React.FC = () => {
       triggerDownload(new Blob([decryptedBuffer]), filename)
 
       await api.transfers.downloadAck(transferId, { success: true })
-      setDownloadTracker(prev => ({
-        ...prev,
-        [transferId]: { ...(prev[transferId] || {}), decrypted: true },
-      }))
+      updateDownloadTracker(transferId, { decrypted: true })
       setStatusMsg(`Decryption successful! "${filename}" downloaded. The transfer is retained in your inbox so you can also download the raw encrypted file, or click Remove when done.`)
     } catch (err: any) {
       setError(err.message || 'Decryption failed. Authentication tag mismatch or corrupt ciphertext.')
@@ -128,10 +151,7 @@ export const InboxPage: React.FC = () => {
       triggerDownload(new Blob([bytes], { type: 'application/octet-stream' }), binFilename)
 
       await api.transfers.downloadAck(transferId, { success: true })
-      setDownloadTracker(prev => ({
-        ...prev,
-        [transferId]: { ...(prev[transferId] || {}), encrypted: true },
-      }))
+      updateDownloadTracker(transferId, { encrypted: true })
       setStatusMsg(`Encrypted file "${binFilename}" downloaded! The transfer is retained in your inbox so you can also decrypt & download, or click Remove when done.`)
     } catch (err: any) {
       setError(err.message || 'Failed to download encrypted file.')
@@ -155,6 +175,16 @@ export const InboxPage: React.FC = () => {
     try {
       await api.transfers.delete(transferId)
       setPendingTransfers(prev => prev.filter(t => t.transfer_id !== transferId))
+      setDownloadTracker(prev => {
+        const updated = { ...prev }
+        delete updated[transferId]
+        try {
+          localStorage.setItem('sfs_download_tracker', JSON.stringify(updated))
+        } catch {
+          // ignore
+        }
+        return updated
+      })
       setStatusMsg('Transfer removed and server copy permanently purged.')
     } catch (err: any) {
       setError(err.message || 'Failed to remove transfer from server.')
@@ -164,21 +194,30 @@ export const InboxPage: React.FC = () => {
   }
 
   return (
-    <div className="page-shell">
-      <div className="glass-card">
+    <div className="page-shell" style={{ padding: '1.5rem 1rem' }}>
+      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <span style={{ margin: '0 0.5rem' }}>/</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>Recipient Inbox</span>
+      </nav>
+
+      <div className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h2>Inbox & Pending Transfers</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              Select whether to decrypt client-side or download the raw encrypted ciphertext (.bin). Transfers remain available until you download both files or choose to remove them.
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.35rem' }}>
+              Recipient Inbox &amp; Pending Transfers
+            </h1>
+            <p style={{ color: '#606060', fontSize: '0.88rem', margin: 0, lineHeight: 1.5 }}>
+              Decrypt incoming transfers locally in your browser using your hardware-stored private key.
             </p>
           </div>
-          <button onClick={fetchPending} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '6px' }}>
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-            Refresh
+          <button
+            onClick={fetchPending}
+            className="btn-secondary"
+            style={{ padding: '0.5rem 1rem', background: '#FFFFFF', border: '1px solid #C6C6C6', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#150202' }}
+          >
+            ↻ Refresh Inbox
           </button>
         </div>
 
@@ -186,19 +225,21 @@ export const InboxPage: React.FC = () => {
         {statusMsg && <div className="alert alert-success">{statusMsg}</div>}
 
         {loading ? (
-          <div className="empty-state">Loading pending transfers...</div>
+          <div className="empty-state">Loading pending encrypted transfers...</div>
         ) : pendingTransfers.length === 0 ? (
-          <div className="empty-state">No pending files queued for delivery.</div>
+          <div className="empty-state">No pending transfers queued for your account.</div>
         ) : (
-          <div className="table-container">
-            <table>
+          /* Table conforms to DBIM Section 4.1.1.i:
+             "The Table must have left-aligned text, right-aligned numbers, and center-aligned column names." */
+          <div className="table-container" style={{ border: '1px solid #EBEAEA', borderRadius: '8px', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr>
-                  <th>Sender</th>
-                  <th>Transfer ID</th>
-                  <th>File Size</th>
-                  <th>Status & Downloads</th>
-                  <th style={{ minWidth: '340px' }}>Actions</th>
+                <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #EBEAEA' }}>
+                  <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Sender</th>
+                  <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Transfer ID</th>
+                  <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>File Size</th>
+                  <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Status</th>
+                  <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A', minWidth: '320px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,100 +247,77 @@ export const InboxPage: React.FC = () => {
                   const isProcessing = activeTransferId === item.transfer_id
                   const isRemoving = removingId === item.transfer_id
                   const tracker = downloadTracker[item.transfer_id] || {}
-                  const bothDownloaded = tracker.decrypted && tracker.encrypted
 
                   return (
-                    <tr key={item.transfer_id}>
-                      <td><strong>{item.sender}</strong></td>
-                      <td className="mono-cell">{item.transfer_id.slice(0, 18)}...</td>
-                      <td>
-                        <span className="badge badge-pending" style={{ background: '#f1f5f9', color: '#475569' }}>
+                    <tr key={item.transfer_id} style={{ borderBottom: '1px solid #EBEAEA' }}>
+                      {/* Left-aligned text (DBIM Section 4.1.1.i) */}
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#150202', fontWeight: 600 }}>
+                        {item.sender}
+                      </td>
+                      {/* Monospace Identifier */}
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#606060', fontSize: '0.82rem', fontFamily: 'monospace' }}>
+                        {item.transfer_id.slice(0, 18)}...
+                      </td>
+                      {/* Right-aligned numbers (DBIM Section 4.1.1.i) */}
+                      <td style={{ textAlign: 'right', padding: '0.85rem 1rem' }}>
+                        <span style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', color: '#150202', padding: '3px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
                           {formatFileSize(item.file_size_bytes)}
                         </span>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {/* Status */}
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.35rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                           {tracker.decrypted && (
-                            <span className="badge" style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.75rem' }}>
+                            <span style={{ background: '#E6F4EA', color: '#198754', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
                               Decrypted ✓
                             </span>
                           )}
                           {tracker.encrypted && (
-                            <span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: '0.75rem' }}>
-                              Encrypted (.bin) ✓
+                            <span style={{ background: '#D2DFFF', color: '#162F6A', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                              Ciphertext (.bin) ✓
                             </span>
                           )}
                           {!tracker.decrypted && !tracker.encrypted && (
-                            <span className="badge badge-pending">{item.status}</span>
-                          )}
-                          {bothDownloaded && (
-                            <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.72rem' }}>
-                              Ready to remove
+                            <span style={{ background: '#FFFBEB', color: '#916100', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                              {item.status}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {/* Action buttons */}
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {/* Decrypt & Download (Section 4.5 i: max 3 words) */}
                           <button
                             className="btn-primary"
-                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
+                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', backgroundColor: '#214AAB' }}
                             disabled={isProcessing || isRemoving}
                             onClick={() => handleDecryptAndDownload(item.transfer_id)}
                             title="Decrypt client-side using private key and download original file"
                           >
-                            {isProcessing && activeAction === 'decrypt' ? (
-                              'Decrypting...'
-                            ) : (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                                </svg>
-                                Decrypt & Download
-                              </>
-                            )}
+                            {isProcessing && activeAction === 'decrypt' ? 'Decrypting...' : 'Decrypt & Download'}
                           </button>
 
+                          {/* Download Raw Ciphertext */}
                           <button
                             className="btn-secondary"
-                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
+                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
                             disabled={isProcessing || isRemoving}
                             onClick={() => handleDownloadEncryptedBin(item.transfer_id)}
                             title="Download raw ciphertext blob without decrypting"
                           >
-                            {isProcessing && activeAction === 'bin' ? (
-                              'Downloading...'
-                            ) : (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                  <polyline points="7 10 12 15 17 10" />
-                                  <line x1="12" y1="15" x2="12" y2="3" />
-                                </svg>
-                                Download Encrypted (.bin)
-                              </>
-                            )}
+                            {isProcessing && activeAction === 'bin' ? 'Downloading...' : 'Download (.bin)'}
                           </button>
 
+                          {/* Secondary action with warning (Annexure B.xiii) */}
                           <button
                             className="btn-danger"
-                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
+                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', background: '#FFFFFF', border: '1px solid #DC3545', color: '#DC3545' }}
                             disabled={isProcessing || isRemoving}
                             onClick={() => handleRemoveTransfer(item.transfer_id)}
                             title="Permanently remove transfer and purge file from server"
                           >
-                            {isRemoving ? (
-                              'Removing...'
-                            ) : (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
-                                Remove
-                              </>
-                            )}
+                            {isRemoving ? 'Purging...' : 'Remove'}
                           </button>
                         </div>
                       </td>

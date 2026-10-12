@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 
 interface LogEntry {
@@ -58,8 +59,7 @@ export const AdminPage: React.FC = () => {
       "• ALL pending & completed file transfers\n" +
       "• ALL user activity logs & forensic audits\n" +
       "• ALL local encrypted blob files\n\n" +
-      "Only the default administrator ('admin' / 'admin123456') will remain.\n\n" +
-      "Are you sure you want to completely wipe everything?"
+      "This cannot be undone. Are you sure?"
     )
     if (!confirmed) return
 
@@ -68,76 +68,48 @@ export const AdminPage: React.FC = () => {
     setWipeNotice(null)
     try {
       const res = await api.admin.resetDatabase()
-      setWipeNotice(res.message || 'Database wiped successfully! System reset to factory default.')
-      if (activeTab === 'users') fetchUsers()
-      else if (activeTab === 'activities') fetchActivities()
-      else fetchLogs()
+      setWipeNotice(res.message || "Database wiped cleanly. All tables have been re-initialized.")
+      await fetchData()
     } catch (err: any) {
-      setError(err.message || 'Failed to wipe database.')
+      setError(err.message || "Failed to reset database.")
     } finally {
       setWipingDb(false)
     }
   }
 
-  const fetchLogs = async () => {
-    setLoading(true)
+  const handleGeneratePdf = async (username: string) => {
+    setDownloadingPdf(username)
     setError(null)
     try {
-      const res = await api.admin.logs()
-      setLogs(res.entries || [])
+      await api.admin.generatePdf(username)
     } catch (err: any) {
-      setError(err.message || 'Access denied. Admin session required.')
+      setError(`Failed to download report for ${username}: ${err.message}`)
     } finally {
-      setLoading(false)
+      setDownloadingPdf(null)
     }
   }
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     setLoading(true)
-    setError(null)
     try {
-      const res = await api.admin.users()
-      setUsers(res.users || [])
+      const [logsRes, usersRes, actRes] = await Promise.all([
+        api.admin.logs(),
+        api.admin.users(),
+        api.admin.activityLogs(),
+      ])
+      setLogs(logsRes.entries || [])
+      setUsers(usersRes.users || [])
+      setActivities(actRes.entries || [])
     } catch (err: any) {
-      setError(err.message || 'Access denied. Admin session required.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchActivities = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await api.admin.activityLogs()
-      setActivities(res.entries || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load activity logs.')
+      setError(err.message || 'Failed to fetch administrative audit records')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (activeTab === 'transfers') {
-      fetchLogs()
-    } else if (activeTab === 'users') {
-      fetchUsers()
-    } else if (activeTab === 'activities') {
-      fetchActivities()
-    }
-  }, [activeTab])
-
-  const handleGeneratePdf = async (username: string) => {
-    setDownloadingPdf(username)
-    try {
-      await api.admin.generatePdf(username)
-    } catch (err: any) {
-      alert(err.message || 'PDF generation failed')
-    } finally {
-      setDownloadingPdf(null)
-    }
-  }
+    fetchData()
+  }, [])
 
   const filteredLogs = logs.filter(
     l =>
@@ -163,13 +135,26 @@ export const AdminPage: React.FC = () => {
   )
 
   return (
-    <div className="page-shell">
-      <section className="page-hero admin-hero">
+    <div className="page-shell" style={{ padding: '1.5rem 1rem' }}>
+      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <span style={{ margin: '0 0.5rem' }}>/</span>
+        <span style={{ color: '#214AAB', textDecoration: 'none' }}>Ministry</span>
+        <span style={{ margin: '0 0.5rem' }}>/</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>Forensic Audit &amp; Administration</span>
+      </nav>
+
+      <section className="page-hero admin-hero" style={{ marginBottom: '1.5rem' }}>
         <div>
-          <p className="eyebrow" style={{ color: 'var(--primary-accent)' }}>Metadata-only audit & security oversight</p>
-          <h1>System Audit & Admin Control</h1>
-          <p>
-            Review registered users, track last login timestamps, inspect forensic activity trails, and generate official enquiry reports.
+          <div style={{ color: '#214AAB', fontWeight: 700, fontSize: '0.8rem', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '4px' }}>
+            Metadata-Only Forensic Audit &amp; Security Oversight
+          </div>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.5rem' }}>
+            System Audit &amp; Administrative Governance
+          </h1>
+          <p style={{ color: '#606060', fontSize: '0.92rem', margin: 0, lineHeight: 1.5 }}>
+            Review registered user identities, track session access timestamps, inspect forensic activity trails, and generate official enquiry reports.
           </p>
         </div>
       </section>
@@ -177,73 +162,84 @@ export const AdminPage: React.FC = () => {
       {error && <div className="alert alert-error">{error}</div>}
       {wipeNotice && <div className="alert alert-success">{wipeNotice}</div>}
 
+      {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button
-          className={activeTab === 'users' ? 'btn-primary' : 'btn-secondary'}
+          type="button"
           onClick={() => { setActiveTab('users'); setSearchQuery('') }}
+          style={{
+            padding: '0.55rem 1.15rem',
+            borderRadius: '6px',
+            border: activeTab === 'users' ? '1px solid #214AAB' : '1px solid #C6C6C6',
+            backgroundColor: activeTab === 'users' ? '#D2DFFF' : '#FFFFFF',
+            color: activeTab === 'users' ? '#162F6A' : '#150202',
+            fontWeight: activeTab === 'users' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
           Registered Users ({users.length})
         </button>
         <button
-          className={activeTab === 'activities' ? 'btn-primary' : 'btn-secondary'}
+          type="button"
           onClick={() => { setActiveTab('activities'); setSearchQuery('') }}
+          style={{
+            padding: '0.55rem 1.15rem',
+            borderRadius: '6px',
+            border: activeTab === 'activities' ? '1px solid #214AAB' : '1px solid #C6C6C6',
+            backgroundColor: activeTab === 'activities' ? '#D2DFFF' : '#FFFFFF',
+            color: activeTab === 'activities' ? '#162F6A' : '#150202',
+            fontWeight: activeTab === 'activities' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
           Activity Logs
         </button>
         <button
-          className={activeTab === 'transfers' ? 'btn-primary' : 'btn-secondary'}
+          type="button"
           onClick={() => { setActiveTab('transfers'); setSearchQuery('') }}
+          style={{
+            padding: '0.55rem 1.15rem',
+            borderRadius: '6px',
+            border: activeTab === 'transfers' ? '1px solid #214AAB' : '1px solid #C6C6C6',
+            backgroundColor: activeTab === 'transfers' ? '#D2DFFF' : '#FFFFFF',
+            color: activeTab === 'transfers' ? '#162F6A' : '#150202',
+            fontWeight: activeTab === 'transfers' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
           Transfer Audit Logs
         </button>
 
         <button
-          className="btn-danger"
+          type="button"
           style={{
             marginLeft: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.55rem 1rem',
-            fontSize: '0.85rem',
+            padding: '0.55rem 1.1rem',
+            fontSize: '0.82rem',
             fontWeight: 600,
-            borderRadius: '8px',
+            borderRadius: '6px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #DC3545',
+            color: '#DC3545',
+            cursor: 'pointer',
           }}
           onClick={handleResetDatabase}
           disabled={wipingDb}
           title="Permanently wipe all database tables, users, transfers, and audit logs"
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            <line x1="10" y1="11" x2="10" y2="17" />
-            <line x1="14" y1="11" x2="14" y2="17" />
-          </svg>
-          {wipingDb ? 'Wiping Database...' : 'Wipe All Tables & Reset DB'}
+          {wipingDb ? 'Wiping Database...' : 'Reset Database Tables'}
         </button>
       </div>
 
-
-      <section className="glass-card admin-panel">
-        <div className="admin-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+      <section className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '1.75rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           <input
             type="text"
             className="form-control"
-            style={{ maxWidth: '380px' }}
+            style={{ maxWidth: '380px', backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             placeholder={
               activeTab === 'users'
                 ? 'Search users by username or email...'
@@ -254,9 +250,9 @@ export const AdminPage: React.FC = () => {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
-          <div className="log-count" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          <div style={{ color: '#606060', fontSize: '0.85rem' }}>
             Showing{' '}
-            <strong>
+            <strong style={{ color: '#162F6A' }}>
               {activeTab === 'users'
                 ? filteredUsers.length
                 : activeTab === 'activities'
@@ -267,65 +263,65 @@ export const AdminPage: React.FC = () => {
           </div>
         </div>
 
-        {/* TAB 1: USERS LIST */}
+        {/* TAB 1: USERS LIST (Table conforms to DBIM Section 4.1.1.i) */}
         {activeTab === 'users' && (
           loading ? (
             <div className="empty-state">Loading registered users...</div>
           ) : filteredUsers.length === 0 ? (
             <div className="empty-state">No users found matching search criteria.</div>
           ) : (
-            <div className="table-container">
-              <table>
+            <div className="table-container" style={{ border: '1px solid #EBEAEA', borderRadius: '8px', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Registered At</th>
-                    <th>Last Login Details</th>
-                    <th>Forensic Report</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #EBEAEA' }}>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Username</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Email</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Role</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Registered At</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Last Login</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Forensic Report</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map(user => (
-                    <tr key={user.username}>
-                      <td>
-                        <span style={{ fontWeight: 600 }}>{user.username}</span>
+                    <tr key={user.username} style={{ borderBottom: '1px solid #EBEAEA' }}>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', fontWeight: 600, color: '#150202' }}>
+                        {user.username}
                       </td>
-                      <td className="muted-cell">{user.email}</td>
-                      <td>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#606060' }}>{user.email}</td>
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
                         {user.is_admin ? (
-                          <span className="badge badge-admin">Administrator</span>
+                          <span style={{ background: '#D2DFFF', color: '#162F6A', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                            Administrator
+                          </span>
                         ) : (
-                          <span className="badge badge-pending" style={{ background: '#f1f5f9', color: '#475569' }}>
-                            User
+                          <span style={{ background: '#F8FAFC', color: '#606060', border: '1px solid #EBEAEA', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                            Citizen User
                           </span>
                         )}
                       </td>
-                      <td className="muted-cell">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                      <td style={{ textAlign: 'right', padding: '0.85rem 1rem', color: '#606060', fontSize: '0.85rem' }}>
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString('en-GB') : '-'}
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'right', padding: '0.85rem 1rem' }}>
                         {user.last_login_at ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.85rem' }}>
-                            <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>
-                              {new Date(user.last_login_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                          <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.82rem', alignItems: 'flex-end' }}>
+                            <span style={{ fontWeight: 600, color: '#150202' }}>
+                              {new Date(user.last_login_at).toLocaleDateString('en-GB')}
                             </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#606060' }}>
                               {new Date(user.last_login_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         ) : (
-                          <span className="badge" style={{ background: '#f8fafc', color: '#94a3b8', border: '1px dashed #cbd5e1' }}>
-                            Never Logged In
-                          </span>
+                          <span style={{ color: '#8E8E8E', fontSize: '0.78rem' }}>Never</span>
                         )}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
                           <button
                             className="btn-secondary"
-                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
                             onClick={() => {
                               setSearchQuery(user.username)
                               setActiveTab('activities')
@@ -335,21 +331,11 @@ export const AdminPage: React.FC = () => {
                           </button>
                           <button
                             className="btn-primary"
-                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', backgroundColor: '#214AAB' }}
                             disabled={downloadingPdf === user.username}
                             onClick={() => handleGeneratePdf(user.username)}
                           >
-                            {downloadingPdf === user.username ? (
-                              'Generating...'
-                            ) : (
-                              <>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                  <polyline points="14 2 14 8 20 8" />
-                                </svg>
-                                Export PDF
-                              </>
-                            )}
+                            {downloadingPdf === user.username ? 'Generating...' : 'Export PDF'}
                           </button>
                         </div>
                       </td>
@@ -361,69 +347,68 @@ export const AdminPage: React.FC = () => {
           )
         )}
 
-        {/* TAB 2: SYSTEM ACTIVITY LOGS */}
+        {/* TAB 2: SYSTEM ACTIVITY LOGS (Table conforms to DBIM Section 4.1.1.i) */}
         {activeTab === 'activities' && (
           loading ? (
             <div className="empty-state">Loading user activity log records...</div>
           ) : filteredActivities.length === 0 ? (
             <div className="empty-state">No activity logs found matching filter.</div>
           ) : (
-            <div className="table-container">
-              <table>
+            <div className="table-container" style={{ border: '1px solid #EBEAEA', borderRadius: '8px', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr>
-                    <th>Timestamp (UTC)</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Details</th>
-                    <th>Report</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #EBEAEA' }}>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Timestamp</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>User</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Action</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Details</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Report</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredActivities.map(entry => (
-                    <tr key={entry.id}>
-                      <td className="muted-cell" style={{ whiteSpace: 'nowrap' }}>
-                        {new Date(entry.timestamp).toLocaleString()}
+                    <tr key={entry.id} style={{ borderBottom: '1px solid #EBEAEA' }}>
+                      <td style={{ textAlign: 'right', padding: '0.85rem 1rem', color: '#606060', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        {new Date(entry.timestamp).toLocaleString('en-GB')}
                       </td>
-                      <td>
-                        <strong>{entry.username}</strong>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#150202', fontWeight: 600 }}>
+                        {entry.username}
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
                         <span
-                          className="badge"
                           style={{
                             background:
                               entry.action === 'login'
-                                ? '#dcfce7'
+                                ? '#E6F4EA'
                                 : entry.action === 'upload_file'
-                                ? '#e0e7ff'
+                                ? '#D2DFFF'
                                 : entry.action === 'download_file'
-                                ? '#fef3c7'
-                                : entry.action === 'delete_account'
-                                ? '#fee2e2'
-                                : '#f1f5f9',
+                                ? '#FFFBEB'
+                                : '#F8FAFC',
                             color:
                               entry.action === 'login'
-                                ? '#166534'
+                                ? '#198754'
                                 : entry.action === 'upload_file'
-                                ? '#4338ca'
+                                ? '#162F6A'
                                 : entry.action === 'download_file'
-                                ? '#b45309'
-                                : entry.action === 'delete_account'
-                                ? '#b91c1c'
-                                : '#334155',
+                                ? '#916100'
+                                : '#150202',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
                           }}
                         >
                           {entry.action}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#150202' }}>
                         {formatActivityDetails(entry.details)}
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
                         <button
                           className="btn-secondary"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem' }}
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
                           disabled={downloadingPdf === entry.username}
                           onClick={() => handleGeneratePdf(entry.username)}
                         >
@@ -438,33 +423,46 @@ export const AdminPage: React.FC = () => {
           )
         )}
 
-        {/* TAB 3: TRANSFER AUDIT LOGS */}
+        {/* TAB 3: TRANSFER AUDIT LOGS (Table conforms to DBIM Section 4.1.1.i) */}
         {activeTab === 'transfers' && (
           loading ? (
             <div className="empty-state">Loading file audit logs...</div>
           ) : filteredLogs.length === 0 ? (
             <div className="empty-state">No file transfer logs found matching filter.</div>
           ) : (
-            <div className="table-container">
-              <table>
+            <div className="table-container" style={{ border: '1px solid #EBEAEA', borderRadius: '8px', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Transfer ID</th>
-                    <th>Sender</th>
-                    <th>Receiver</th>
-                    <th>Delivery Status</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #EBEAEA' }}>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Timestamp</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Transfer ID</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Sender</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Receiver</th>
+                    <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredLogs.map((log, idx) => (
-                    <tr key={`${log.transfer_id}-${idx}`}>
-                      <td className="muted-cell">{new Date(log.timestamp).toLocaleString()}</td>
-                      <td className="mono-cell">{log.transfer_id.slice(0, 18)}...</td>
-                      <td>{log.sender}</td>
-                      <td>{log.receiver}</td>
-                      <td>
-                        <span className={`badge ${log.status === 'pending' ? 'badge-pending' : 'badge-delivered'}`}>
+                    <tr key={`${log.transfer_id}-${idx}`} style={{ borderBottom: '1px solid #EBEAEA' }}>
+                      <td style={{ textAlign: 'right', padding: '0.85rem 1rem', color: '#606060', fontSize: '0.82rem' }}>
+                        {new Date(log.timestamp).toLocaleString('en-GB')}
+                      </td>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#606060', fontSize: '0.82rem', fontFamily: 'monospace' }}>
+                        {log.transfer_id.slice(0, 18)}...
+                      </td>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#150202', fontWeight: 600 }}>{log.sender}</td>
+                      <td style={{ textAlign: 'left', padding: '0.85rem 1rem', color: '#150202', fontWeight: 600 }}>{log.receiver}</td>
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
+                        <span
+                          style={{
+                            background: log.status === 'pending' ? '#FFFBEB' : '#E6F4EA',
+                            color: log.status === 'pending' ? '#916100' : '#198754',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                          }}
+                        >
                           {log.status}
                         </span>
                       </td>

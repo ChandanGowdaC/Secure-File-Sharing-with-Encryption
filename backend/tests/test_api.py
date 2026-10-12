@@ -58,10 +58,19 @@ def test_full_e2e_backend_workflow():
     assert login_resp.status_code == 200
     mfa_challenge = login_resp.json()["mfa_challenge_token"]
 
+    # Test MFA resend
+    resend_resp = client.post("/api/v1/auth/mfa/resend", json={
+        "mfa_challenge_token": mfa_challenge
+    })
+    assert resend_resp.status_code == 200
+    assert resend_resp.json()["mfa_required"] is True
+    new_challenge = resend_resp.json()["mfa_challenge_token"]
+    assert new_challenge is not None
+
     mfa_resp = client.post("/api/v1/auth/mfa/verify", json={
         "username_or_email": "alice",
         "code": "000000",
-        "mfa_challenge_token": mfa_challenge
+        "mfa_challenge_token": new_challenge
     })
     assert mfa_resp.status_code == 200
     alice_token = mfa_resp.json()["session_token"]
@@ -125,11 +134,11 @@ def test_full_e2e_backend_workflow():
     assert payload["sender_ephemeral_public_key"] == dummy_ephemeral_pubkey
     assert payload["file_size_bytes"] == len(b"SECRET_ENCRYPTED_FILE_BYTES")
 
-    # Check DB to confirm blob_path was cleared/purged on server
+    # Check DB to confirm blob_path is retained for subsequent downloads
     db = SessionLocal()
     t_obj = db.query(Transfer).filter(Transfer.transfer_id == transfer_id).first()
     assert t_obj.status == "delivered"
-    assert t_obj.blob_path is None
+    assert t_obj.blob_path is not None
     db.close()
 
     # 9. Acknowledge Download Success - F.13/F.14
@@ -137,6 +146,24 @@ def test_full_e2e_backend_workflow():
         "success": True
     })
     assert ack_resp.status_code == 204
+
+    # Verify second delivery succeeds without 404 (dual download support)
+    second_deliver = client.post(f"/api/v1/transfers/{transfer_id}/deliver", headers=bob_headers)
+    assert second_deliver.status_code == 200
+
+    # Transfer remains in inbox pending list
+    inbox_resp = client.get("/api/v1/transfers/pending", headers=bob_headers)
+    assert len(inbox_resp.json()["transfers"]) == 1
+
+    # Explicit remove transfer purges blob permanently from server storage
+    del_resp = client.delete(f"/api/v1/transfers/{transfer_id}", headers=bob_headers)
+    assert del_resp.status_code == 204
+
+    db = SessionLocal()
+    t_obj = db.query(Transfer).filter(Transfer.transfer_id == transfer_id).first()
+    assert t_obj.status == "downloaded"
+    assert t_obj.blob_path is None
+    db.close()
 
     # 10. Login Admin & Check Metadata Logs - F.15
     admin_login = client.post("/api/v1/auth/login", json={

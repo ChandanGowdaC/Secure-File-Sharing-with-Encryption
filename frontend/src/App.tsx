@@ -1,92 +1,76 @@
-import { useState, useEffect } from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom'
+import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
+import { UploadPage } from './pages/UploadPage'
+import { InboxPage } from './pages/InboxPage'
+import { AdminPage } from './pages/AdminPage'
+import { LandingPage } from './pages/LandingPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
+import { Header } from './components/Header'
+import { Footer } from './components/Footer'
+import { CookieBanner } from './components/CookieBanner'
+import { api, setAuthToken } from './api/client'
+import { getStoredPrivateKey, clearStoredPrivateKey } from './crypto/keystore'
 
-import RegisterPage from './pages/RegisterPage'
-import LoginPage from './pages/LoginPage'
-import UploadPage from './pages/UploadPage'
-import InboxPage from './pages/InboxPage'
-import AdminPage from './pages/AdminPage'
-import { setAuthToken, api } from './api/client'
-import { clearStoredPrivateKey, getStoredPrivateKey } from '../../crypto/src/keystore'
+const BackendStatusIndicator: React.FC = () => {
+  const [isOnline, setIsOnline] = useState<boolean | null>(null)
 
-import { Navigate, useNavigate } from 'react-router-dom'
+  useEffect(() => {
+    let mounted = true
+    const checkHealth = async () => {
+      try {
+        await api.health()
+        if (mounted) setIsOnline(true)
+      } catch {
+        if (mounted) setIsOnline(false)
+      }
+    }
+    checkHealth()
+    const interval = setInterval(checkHealth, 8000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
 
-function Navigation({ user, isAdmin, unreadCount, onLogout, onDeleteAccount }: { user: string | null; isAdmin: boolean; unreadCount: number; onLogout: () => void; onDeleteAccount: () => void }) {
+  if (isOnline === null) return null
+
   return (
-    <nav style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '1.2rem 2rem',
-      background: 'rgba(18, 25, 41, 0.6)',
-      backdropFilter: 'blur(12px)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-      marginBottom: '2rem'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <div style={{
-          width: '36px',
-          height: '36px',
-          borderRadius: '10px',
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 'bold',
-          color: '#fff'
-        }}>🛡️</div>
-        <Link to="/" style={{ color: '#fff', textDecoration: 'none', fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          Secure File Sharing <span className="gradient-text">Encryption</span>
-        </Link>
-      </div>
-
-      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-        {user ? (
-          <>
-            <Link to="/upload" style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 500 }}>📤 Send File</Link>
-            <Link to="/inbox" style={{ color: '#94a3b8', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <span>📥 Inbox</span>
-              {unreadCount > 0 && (
-                <span style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#ffffff',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  padding: '2px 7px',
-                  borderRadius: '10px',
-                  lineHeight: '1.1',
-                  boxShadow: '0 0 10px rgba(239, 68, 68, 0.6)',
-                  animation: 'pulse 2s infinite'
-                }}>
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
-            {isAdmin && (
-              <Link to="/admin" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 600, background: 'rgba(99, 102, 241, 0.1)', padding: '0.3rem 0.7rem', borderRadius: '6px' }}>
-                ⚙️ Audit Logs (Admin)
-              </Link>
-            )}
-            <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.9rem' }}>
-              👤 {user} {isAdmin && <span className="badge badge-pending" style={{ fontSize: '0.7rem', marginLeft: '4px' }}>ADMIN</span>}
-            </span>
-            <button onClick={onLogout} className="btn-secondary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
-              Logout
-            </button>
-            {!isAdmin && (
-              <button onClick={onDeleteAccount} className="btn-danger" style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
-                Delete account
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <Link to="/login" className="btn-secondary" style={{ textDecoration: 'none', padding: '0.5rem 1rem' }}>Login</Link>
-            <Link to="/register" className="btn-primary" style={{ textDecoration: 'none', padding: '0.5rem 1rem' }}>Register</Link>
-          </>
-        )}
-      </div>
-    </nav>
+    <div
+      className={`status-indicator ${isOnline ? 'status-online' : 'status-offline'}`}
+      title={isOnline ? 'FastAPI Backend connection healthy' : 'Backend connection unavailable'}
+      style={{
+        position: 'fixed',
+        bottom: '1.5rem',
+        right: '1.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        padding: '0.45rem 0.9rem',
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #EBEAEA',
+        borderRadius: '20px',
+        boxShadow: '0 4px 12px rgba(21, 2, 2, 0.08)',
+        fontSize: '0.78rem',
+        fontWeight: 600,
+        zIndex: 9000,
+        color: '#150202',
+      }}
+    >
+      <div
+        className="status-dot"
+        style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: isOnline ? '#198754' : '#DC3545',
+        }}
+      />
+      Server: {isOnline ? 'Online' : 'Offline'}
+    </div>
   )
 }
 
@@ -94,8 +78,18 @@ export default function App() {
   const navigate = useNavigate()
   const [currentUser, setCurrentUser] = useState<string | null>(() => localStorage.getItem('sfs_username'))
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem('sfs_is_admin') === 'true')
+  const [lastLoginAt, setLastLoginAt] = useState<string | null>(() => localStorage.getItem('sfs_last_login'))
   const [unreadCount, setUnreadCount] = useState<number>(0)
   const [hasPrivateKey, setHasPrivateKey] = useState<boolean>(false)
+  const [toastMessage, setToastMessage] = useState<string>('')
+  const [language, setLanguage] = useState<'en' | 'hi'>('en')
+
+  // Dynamic Language Switch (DBIM Section 7.5.1 ii)
+  const toggleLanguage = () => {
+    const nextLang = language === 'en' ? 'hi' : 'en'
+    setLanguage(nextLang)
+    document.documentElement.lang = nextLang
+  }
 
   const checkUnread = async () => {
     if (!currentUser) {
@@ -112,6 +106,37 @@ export default function App() {
     }
   }
 
+  const refreshProfile = async () => {
+    if (!currentUser) return
+    try {
+      const me = await api.auth.me()
+      if (me && me.last_login_at) {
+        localStorage.setItem('sfs_last_login', me.last_login_at)
+        setLastLoginAt(me.last_login_at)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleLogout = () => {
+    setAuthToken(null)
+    localStorage.removeItem('sfs_username')
+    localStorage.removeItem('sfs_is_admin')
+    localStorage.removeItem('sfs_last_login')
+    setCurrentUser(null)
+    setIsAdmin(false)
+    setLastLoginAt(null)
+  }
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      handleLogout()
+    }
+    window.addEventListener('sfs_auth_expired', handleAuthExpired)
+    return () => window.removeEventListener('sfs_auth_expired', handleAuthExpired)
+  }, [])
+
   useEffect(() => {
     if (!currentUser) {
       setHasPrivateKey(false)
@@ -120,23 +145,20 @@ export default function App() {
     }
     getStoredPrivateKey(currentUser).then(key => setHasPrivateKey(!!key)).catch(() => setHasPrivateKey(false))
     checkUnread()
+    refreshProfile()
     const interval = setInterval(checkUnread, 8000)
     return () => clearInterval(interval)
   }, [currentUser])
 
-  const handleLoginSuccess = (username: string, adminStatus: boolean = false) => {
+  const handleLoginSuccess = (username: string, adminStatus: boolean = false, lastLogin?: string | null) => {
     localStorage.setItem('sfs_username', username)
     localStorage.setItem('sfs_is_admin', adminStatus ? 'true' : 'false')
+    if (lastLogin) {
+      localStorage.setItem('sfs_last_login', lastLogin)
+      setLastLoginAt(lastLogin)
+    }
     setCurrentUser(username)
     setIsAdmin(adminStatus)
-  }
-
-  const handleLogout = () => {
-    setAuthToken(null)
-    localStorage.removeItem('sfs_username')
-    localStorage.removeItem('sfs_is_admin')
-    setCurrentUser(null)
-    setIsAdmin(false)
   }
 
   const handleDeleteAccount = async () => {
@@ -150,27 +172,61 @@ export default function App() {
       await api.auth.deleteAccount()
       await clearStoredPrivateKey(currentUser)
       handleLogout()
-      navigate('/login', { replace: true })
+      setToastMessage('Your account has been successfully deleted.')
+      setTimeout(() => setToastMessage(''), 5000)
+      navigate('/', { replace: true })
     } catch (err: any) {
       window.alert(err.message || 'Account deletion failed. Please try again.')
     }
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navigation user={currentUser} isAdmin={isAdmin} unreadCount={unreadCount} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} />
-      
-      <main className="app-container" style={{ flex: 1 }}>
+    <div className="app-container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF' }}>
+      {/* Header conforming to GoI DBIM v3 Standards */}
+      <Header
+        user={currentUser}
+        isAdmin={isAdmin}
+        lastLogin={lastLoginAt}
+        unreadCount={unreadCount}
+        onLogout={handleLogout}
+        onDeleteAccount={handleDeleteAccount}
+        currentLanguage={language}
+        onToggleLanguage={toggleLanguage}
+      />
+
+      {toastMessage && (
+        <div className="toast-notification" style={{ position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 10000, background: '#E6F4EA', border: '1px solid #198754', padding: '0.85rem 1.25rem', borderRadius: '8px', color: '#198754', fontWeight: 600 }}>
+          {toastMessage}
+        </div>
+      )}
+
+      <BackendStatusIndicator />
+
+      {/* Main Content Area with Skip Link anchor id (WCAG 2.1 / GIGW 3.0) */}
+      <main id="main-content" className="main-content" style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
         {currentUser && !hasPrivateKey && !isAdmin && (
-          <div className="alert alert-info">
-            💡 <strong>Crypto Key Alert:</strong> Long-term private key not detected in IndexedDB. Generate or restore your cryptographic identity on the Register page.
+          <div style={{ maxWidth: '1100px', margin: '1rem auto 0', padding: '0 1rem' }}>
+            <div className="alert alert-info" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>ℹ️</span>
+              <div>
+                <strong>Crypto Key Alert:</strong> Long-term private key not detected in your browser&apos;s IndexedDB. Generate or restore your cryptographic identity on the Register page.
+              </div>
+            </div>
           </div>
         )}
 
         <Routes>
-          <Route path="/" element={<UploadPage />} />
+          {/* Landing / Home */}
+          <Route path="/" element={<LandingPage />} />
+
+          {/* User Authentication & Services */}
           <Route path="/register" element={<RegisterPage onRegisterSuccess={handleLoginSuccess} />} />
           <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
+
+          {/* Secure Transfer Services */}
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route
@@ -179,14 +235,16 @@ export default function App() {
               isAdmin ? (
                 <AdminPage />
               ) : (
-                <div style={{ maxWidth: '500px', margin: '3rem auto', textAlign: 'center' }} className="glass-card">
-                  <h3 style={{ color: '#ef4444', marginBottom: '1rem' }}>⛔ Access Restricted</h3>
-                  <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-                    Audit Logs are restricted to system administrators only. Please log in with the administrator account.
-                  </p>
-                  <Link to="/login" className="btn-primary" style={{ textDecoration: 'none' }}>
-                    Sign in as Admin
-                  </Link>
+                <div className="page-shell page-shell-narrow" style={{ padding: '2rem 1rem' }}>
+                  <div className="glass-card text-center" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem' }}>
+                    <h2 style={{ color: '#DC3545', marginBottom: '1rem' }}>Administrative Access Restricted</h2>
+                    <p style={{ color: '#606060', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+                      System Audit Logs and Forensic Oversight are restricted to authorized administrators only.
+                    </p>
+                    <Link to="/login" className="btn-primary" style={{ backgroundColor: '#214AAB' }}>
+                      Sign in as Administrator
+                    </Link>
+                  </div>
                 </div>
               )
             }
@@ -195,53 +253,11 @@ export default function App() {
         </Routes>
       </main>
 
-      <footer style={{
-        textAlign: 'center',
-        padding: '2.5rem 1.5rem',
-        color: 'var(--text-muted)',
-        fontSize: '0.85rem',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(11, 17, 33, 0.8)',
-        backdropFilter: 'blur(10px)',
-        marginTop: '3rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#e2e8f0' }}>
-          Made by <span style={{ color: '#818cf8' }}>Chandan Gowda C</span>, 241IT016, <span style={{ color: '#818cf8' }}>Prabhav P</span>, 241IT053 and <span style={{ color: '#818cf8' }}>Sucheth K Katte</span>, 241IT078
-        </div>
+      {/* Light Color Theme Footer */}
+      <Footer />
 
-        <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-          Under the guidance of <span style={{ color: '#818cf8', fontWeight: 600 }}>Dr. Jaidhar C D</span>
-        </div>
-
-        <div style={{ maxWidth: '720px', lineHeight: '1.6', color: '#94a3b8', fontSize: '0.82rem' }}>
-          Zero-knowledge end-to-end encrypted file sharing platform powered by Diffie-Hellman (ECDH P-256) key agreement, HKDF-SHA256 derivation, and AES-256-GCM authenticated encryption. Files are encrypted client-side in the browser before transfer—the server never sees unencrypted file data or private keys.
-        </div>
-
-        <div style={{
-          display: 'inline-flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          padding: '0.4rem 0.9rem',
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '8px',
-          fontSize: '0.78rem',
-          color: '#cbd5e1'
-        }}>
-          🛡️ <strong>Admin Details:</strong> Admin email : <a href="mailto:securefilesharing303.project@gmail.com" style={{ color: '#818cf8', textDecoration: 'none' }}>securefilesharing303.project@gmail.com</a>
-        </div>
-
-        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>
-          © 2026 Secure File Sharing Encryption. All rights reserved.
-        </div>
-      </footer>
+      {/* DPDP Act 2023 Compliant Cookie Consent Banner */}
+      <CookieBanner />
     </div>
   )
 }

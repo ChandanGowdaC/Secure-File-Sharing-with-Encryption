@@ -294,7 +294,7 @@ def test_transfer_lifecycle_and_file_size_preservation():
     assert pending_list[0]["transfer_id"] == transfer_id
     assert pending_list[0]["file_size_bytes"] == len(file_bytes)
 
-    # Deliver transfer (server purges blob)
+    # Deliver transfer (server retains blob for dual download)
     deliver_resp = client.post(f"/api/v1/transfers/{transfer_id}/deliver", headers=receiver_headers)
     assert deliver_resp.status_code == 200
     assert deliver_resp.json()["file_size_bytes"] == len(file_bytes)
@@ -303,6 +303,14 @@ def test_transfer_lifecycle_and_file_size_preservation():
     # Acknowledge download
     ack_resp = client.post(f"/api/v1/transfers/{transfer_id}/download-ack", headers=receiver_headers, json={"success": True})
     assert ack_resp.status_code in (200, 204)
+
+    # Transfer remains available in inbox pending list until receiver explicitly removes it
+    pending_during = client.get("/api/v1/transfers/pending", headers=receiver_headers)
+    assert len(pending_during.json()["transfers"]) == 1
+
+    # Remove transfer explicitly
+    del_resp = client.delete(f"/api/v1/transfers/{transfer_id}", headers=receiver_headers)
+    assert del_resp.status_code == 204
 
     # Pending list should now be empty
     pending_after = client.get("/api/v1/transfers/pending", headers=receiver_headers)

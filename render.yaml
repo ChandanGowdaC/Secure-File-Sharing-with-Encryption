@@ -13,7 +13,7 @@ services:
           name: secure-file-sharing-db
           property: connectionString
       - key: RESET_DATABASE_ON_STARTUP
-        value: "true"
+        value: "false"
       - key: SECRET_KEY
         sync: false
       - key: STORAGE_BACKEND

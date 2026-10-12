@@ -60,7 +60,9 @@ def reset_entire_system() -> dict[str, str]:
     from pathlib import Path
 
     # 1. Purge storage blob directories
-    for path_str in [settings.local_blob_path, "storage/blobs", "/tmp/secure-file-blobs"]:
+    for path_str in [settings.local_blob_path, getattr(settings, "blob_storage_path", None), "storage/blobs", "/tmp/secure-file-blobs"]:
+        if not path_str:
+            continue
         blob_path = Path(path_str)
         try:
             if blob_path.exists():

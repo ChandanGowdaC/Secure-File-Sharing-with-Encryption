@@ -44,6 +44,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!usernameOrEmail.trim() || !password) return
     setLoading(true)
     setError(null)
 
@@ -59,8 +60,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         setMfaNotice(
           res.message ||
             (res.masked_email
-              ? `A 6-digit code has been sent to ${res.masked_email}`
-              : 'Verification code sent to your registered email.')
+              ? `A 6-digit verification code has been sent to ${res.masked_email}`
+              : 'A 6-digit verification code has been sent to your registered email.')
         )
       } else if (res.session_token) {
         setAuthToken(res.session_token)
@@ -69,7 +70,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         navigate('/upload')
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed')
+      setError(err.message || 'Authentication failed. Please verify credentials.')
     } finally {
       setLoading(false)
     }
@@ -81,7 +82,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     const trimmedCode = mfaCode.trim()
     if (trimmedCode.length < 6) {
-      setError('Please enter the 6-digit verification code.')
+      setError('Please enter the complete 6-digit verification code.')
       return
     }
 
@@ -104,7 +105,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         setError('Verification failed. Please try again.')
       }
     } catch (err: any) {
-      setError(err.message || 'Invalid or expired 6-digit code')
+      setError(err.message || 'Invalid or expired 6-digit verification code.')
     } finally {
       setLoading(false)
     }
@@ -136,39 +137,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       if (res.mfa_challenge_token) {
         setMfaChallengeToken(res.mfa_challenge_token)
       }
-      setMfaNotice(res.message || 'A new verification code has been sent to your email.')
+      setMfaNotice(res.message || 'A new verification code has been dispatched to your email.')
       setResendCooldown(30)
     } catch (err: any) {
-      setError(err.message || 'Failed to resend verification code. Please try again.')
+      setError(err.message || 'Failed to resend code. Please try again.')
     } finally {
       setResending(false)
     }
   }
 
+  const isFormValid = usernameOrEmail.trim().length > 0 && password.length > 0
+
   return (
-    <div className="page-shell page-shell-narrow">
-      <div className="glass-card">
-        <h2 style={{ marginBottom: '0.5rem', textAlign: 'center' }}>
-          {mfaChallengeToken ? 'Two-Factor Authentication' : 'Welcome Back'}
-        </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', marginBottom: '1.5rem' }}>
+    <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
+      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <span style={{ margin: '0 0.5rem' }}>/</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>Sign In</span>
+      </nav>
+
+      <div className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#162F6A', textAlign: 'center', margin: '0 0 0.5rem' }}>
+          {mfaChallengeToken ? 'Two-Factor Authentication' : 'Sign In to Portal'}
+        </h1>
+        <p style={{ color: '#606060', fontSize: '0.88rem', textAlign: 'center', marginBottom: '1.5rem', lineHeight: 1.5 }}>
           {mfaChallengeToken
-            ? 'Enter the 6-digit code sent to your registered email'
-            : 'Sign in to access your zero-knowledge encrypted files'}
+            ? 'Enter the 6-digit one-time passcode sent to your registered official email.'
+            : 'Access zero-knowledge encrypted file transfers and browser cryptographic identity.'}
         </p>
+
+        {/* Instructions at the starting of form (DBIM Annexure B.i, Page 109/129) */}
+        <div style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#606060', lineHeight: 1.5 }}>
+          <strong>Instructions:</strong> Please fill in all mandatory fields marked with an asterisk (*). Ensure your browser supports IndexedDB for private key storage.
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
         {mfaNotice && <div className="alert alert-info">{mfaNotice}</div>}
 
         {mfaChallengeToken ? (
+          /* MFA Verification Form (Annexure B - Single column vertical layout) */
           <form onSubmit={handleMfaSubmit}>
             <div className="form-group" style={{ textAlign: 'center' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                6-Digit Verification Code
+              <label htmlFor="mfa-input" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#150202', fontSize: '0.9rem' }}>
+                6-Digit Verification Code <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
               </label>
 
               <div className="otp-input-wrap">
                 <input
+                  id="mfa-input"
                   ref={otpInputRef}
                   type="text"
                   required
@@ -185,13 +202,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   className="form-control otp-input"
                   placeholder="000000"
                   style={{
-                    borderColor: mfaCode.length === 6 ? 'var(--primary-accent)' : '#cbd5e1',
-                    boxShadow: mfaCode.length === 6 ? '0 0 0 3px rgba(91, 141, 239, 0.2)' : 'none',
+                    border: '2px solid #5279D7',
+                    borderRadius: '8px',
+                    color: '#162F6A',
+                    backgroundColor: '#FFFFFF',
                   }}
                 />
               </div>
 
-              {/* Resend Code & Paste Helpers */}
+              {/* Resend & Clipboard Controls */}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
@@ -199,10 +218,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   disabled={resendCooldown > 0 || resending}
                   className="btn-secondary"
                   style={{
-                    fontSize: '0.82rem',
+                    fontSize: '0.8rem',
                     padding: '0.4rem 0.85rem',
-                    borderRadius: '8px',
-                    opacity: resendCooldown > 0 ? 0.65 : 1,
+                    borderRadius: '6px',
                     cursor: resendCooldown > 0 || resending ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -216,104 +234,142 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   type="button"
                   onClick={handlePasteClipboard}
                   className="btn-secondary"
-                  style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem', borderRadius: '8px' }}
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', borderRadius: '6px' }}
                 >
                   Paste from Clipboard
                 </button>
               </div>
 
-              <small style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                Enter the 6-digit verification code sent to your email.
-              </small>
+              <span className="field-help" style={{ display: 'block', color: '#606060', fontSize: '0.8rem' }}>
+                Check your inbox and spam folder for the one-time passcode.
+              </span>
             </div>
 
+            {/* Primary Action Button - disabled until complete 6 digits entered (Annexure B.xiv) */}
             <button
               type="submit"
               disabled={loading || mfaCode.length < 6}
               className="btn-primary btn-full"
-              style={{ marginTop: '1rem' }}
+              style={{
+                marginTop: '1.25rem',
+                backgroundColor: mfaCode.length < 6 ? '#CBD5E1' : '#214AAB',
+                color: '#FFFFFF',
+                cursor: mfaCode.length < 6 ? 'not-allowed' : 'pointer',
+              }}
             >
               {loading ? 'Verifying...' : 'Verify Code & Sign In'}
             </button>
 
+            {/* Secondary Action Button with less visual weight (Annexure B.xiii) */}
             <button
               type="button"
               className="btn-secondary btn-full"
-              style={{ marginTop: '0.75rem' }}
+              style={{ marginTop: '0.75rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
               onClick={() => {
                 setMfaChallengeToken(null)
                 setMfaNotice(null)
                 setMfaCode('')
               }}
             >
-              Back to Login
+              Back to Sign In
             </button>
           </form>
         ) : (
+          /* Login Form (Annexure B - Single column vertical layout, Figure 81) */
           <form onSubmit={handleLoginSubmit}>
+            {/* Field 1: Username or Email */}
             <div className="form-group">
-              <label>Username or Email</label>
+              <label htmlFor="login-username" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px' }}>
+                Username or Official Email <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+              </label>
               <input
+                id="login-username"
                 type="text"
                 required
                 className="form-control"
-                placeholder="Username or email"
+                placeholder="e.g. officer@nic.in or username"
                 value={usernameOrEmail}
                 onChange={e => setUsernameOrEmail(e.target.value)}
+                style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
               />
+              <span className="field-help" style={{ color: '#606060', fontSize: '0.78rem', marginTop: '2px' }}>
+                Enter your registered government username or email address.
+              </span>
             </div>
 
-            <div className="form-group">
-              <label>Password</label>
+            {/* Field 2: Password */}
+            <div className="form-group" style={{ marginTop: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label htmlFor="login-password" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202' }}>
+                  Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+                </label>
+                <Link to="/forgot-password" className="forgot-password-link" style={{ fontSize: '0.8rem', color: '#214AAB' }}>
+                  Forgot Password?
+                </Link>
+              </div>
+
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   className="form-control"
-                  placeholder="Password"
+                  placeholder="Enter your secure password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  style={{ width: '100%', paddingRight: '45px' }}
+                  style={{ width: '100%', paddingRight: '45px', backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   style={{
                     position: 'absolute',
                     right: '12px',
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#94a3b8',
+                    color: '#606060',
                     display: 'flex',
                     alignItems: 'center',
                     padding: '4px',
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
+                  {showPassword ? '👁️' : '👁️‍🗨️'}
                 </button>
               </div>
-              <div style={{ marginTop: '0.25rem', textAlign: 'right' }}>
-                <Link to="/forgot-password" className="forgot-password-link">Forgot Password?</Link>
-              </div>
+              <span className="field-help" style={{ color: '#606060', fontSize: '0.78rem', marginTop: '2px' }}>
+                Case-sensitive alphanumeric password.
+              </span>
             </div>
 
-            <button type="submit" disabled={loading} className="btn-primary btn-full" style={{ marginTop: '1rem' }}>
+            {/* Primary Action Button - disabled until fields entered (Annexure B.xiv) */}
+            <button
+              type="submit"
+              disabled={loading || !isFormValid}
+              className="btn-primary btn-full"
+              style={{
+                marginTop: '1.5rem',
+                backgroundColor: !isFormValid ? '#E2E8F0' : '#214AAB',
+                color: !isFormValid ? '#64748B' : '#FFFFFF',
+                border: !isFormValid ? '1px solid #CBD5E1' : '1px solid #214AAB',
+                cursor: !isFormValid ? 'not-allowed' : 'pointer',
+                boxShadow: !isFormValid ? 'none' : '0 3px 8px rgba(33, 74, 171, 0.25)',
+                transition: 'all 0.2s ease',
+              }}
+            >
               {loading ? 'Authenticating...' : 'Sign In'}
             </button>
           </form>
         )}
+
+        <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid #EBEAEA', textAlign: 'center', fontSize: '0.85rem', color: '#606060' }}>
+          Don&apos;t have a registered cryptographic identity?{' '}
+          <Link to="/register" style={{ color: '#214AAB', fontWeight: 600, textDecoration: 'none' }}>
+            Register New Account
+          </Link>
+        </div>
       </div>
     </div>
   )

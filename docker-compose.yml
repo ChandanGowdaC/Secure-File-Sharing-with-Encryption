@@ -10,7 +10,7 @@ services:
       - blob_data:/app/storage/blobs
     environment:
       - DATABASE_URL=sqlite:///./secure_file_sharing.db
-      - RESET_DATABASE_ON_STARTUP=true
+      - RESET_DATABASE_ON_STARTUP=false
       - CORS_ORIGINS=["http://localhost:5173"]
 
   frontend:

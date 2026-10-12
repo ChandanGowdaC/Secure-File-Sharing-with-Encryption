@@ -7,9 +7,10 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
+  envPrefix: ['VITE_', 'API_'],
   resolve: {
     alias: {
-      '@crypto': path.resolve(rootDir, '../crypto/src'),
+      '@crypto': path.resolve(rootDir, 'src/crypto'),
     },
   },
   server: {

@@ -1,105 +1,128 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import React, { useState, useEffect } from 'react'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 
 export const ResetPasswordPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
-  const navigate = useNavigate();
-  
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  
-  const [strengthLabel, setStrengthLabel] = useState('Weak');
-  const [strengthClass, setStrengthClass] = useState('strength-weak');
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token')
+  const navigate = useNavigate()
+
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  const [strengthLabel, setStrengthLabel] = useState('Weak')
+  const [strengthClass, setStrengthClass] = useState('strength-weak')
 
   useEffect(() => {
     if (!newPassword) {
-      setStrengthLabel('Weak');
-      setStrengthClass('strength-weak');
-      return;
+      setStrengthLabel('Weak')
+      setStrengthClass('strength-weak')
+      return
     }
-    
-    let criteria = 0;
-    if (newPassword.length >= 8) criteria++;
-    if (/[A-Z]/.test(newPassword)) criteria++;
-    if (/[a-z]/.test(newPassword)) criteria++;
-    if (/[0-9]/.test(newPassword)) criteria++;
-    if (/[^A-Za-z0-9]/.test(newPassword)) criteria++;
+
+    let criteria = 0
+    if (newPassword.length >= 8) criteria++
+    if (/[A-Z]/.test(newPassword)) criteria++
+    if (/[a-z]/.test(newPassword)) criteria++
+    if (/[0-9]/.test(newPassword)) criteria++
+    if (/[^A-Za-z0-9]/.test(newPassword)) criteria++
 
     if (criteria <= 2) {
-      setStrengthLabel('Weak');
-      setStrengthClass('strength-weak');
+      setStrengthLabel('Weak')
+      setStrengthClass('strength-weak')
     } else if (criteria <= 4) {
-      setStrengthLabel('Medium');
-      setStrengthClass('strength-medium');
+      setStrengthLabel('Medium')
+      setStrengthClass('strength-medium')
     } else {
-      setStrengthLabel('Strong');
-      setStrengthClass('strength-strong');
+      setStrengthLabel('Strong')
+      setStrengthClass('strength-strong')
     }
-  }, [newPassword]);
+  }, [newPassword])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
+    e.preventDefault()
+    setError('')
+    setMessage('')
 
     if (!token) {
-      setError('Invalid or missing reset token.');
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    
-    if (strengthLabel === 'Weak') {
-      setError('Password is too weak. Please use a stronger password.');
-      return;
+      setError('Invalid or missing password reset token.')
+      return
     }
 
-    setLoading(true);
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please verify both entries.')
+      return
+    }
+
+    if (strengthLabel === 'Weak') {
+      setError('Password is too weak. Please use at least 8 characters with upper, lower, numbers, or symbols.')
+      return
+    }
+
+    setLoading(true)
 
     try {
-      await api.auth.resetPassword({ token, new_password: newPassword });
-      setMessage('Password successfully reset. Redirecting to login...');
-      setTimeout(() => navigate('/login'), 2000);
+      await api.auth.resetPassword({ token, new_password: newPassword })
+      setMessage('Password successfully reset! Redirecting to sign in...')
+      setTimeout(() => navigate('/login'), 2000)
     } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+      setError(err.message || 'Failed to reset password.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  const isFormValid = newPassword.length >= 8 && confirmPassword.length >= 8 && newPassword === confirmPassword
 
   if (!token) {
     return (
-      <div className="page-shell page-shell-narrow">
-        <div className="glass-card text-center">
-          <h2>Invalid Reset Link</h2>
-          <p className="field-help" style={{ marginTop: '1rem' }}>The password reset link is invalid or missing a token.</p>
-          <div style={{ marginTop: '1.5rem' }}>
-            <Link to="/login" className="btn-primary">Back to Login</Link>
-          </div>
+      <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
+        <div className="glass-card text-center" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem' }}>
+          <h2 style={{ color: '#DC3545', margin: '0 0 1rem' }}>Invalid Reset Link</h2>
+          <p style={{ color: '#606060', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+            The password reset link is invalid or has expired. Please request a new link.
+          </p>
+          <Link to="/login" className="btn-primary" style={{ backgroundColor: '#214AAB' }}>
+            Back to Sign In
+          </Link>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="page-shell page-shell-narrow">
-      <div className="glass-card">
-        <h1 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Reset Password</h1>
-        
+    <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
+      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <span style={{ margin: '0 0.5rem' }}>/</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>Reset Password</span>
+      </nav>
+
+      <div className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#162F6A', textAlign: 'center', margin: '0 0 0.5rem' }}>
+          Set New Password
+        </h1>
+        <p style={{ color: '#606060', fontSize: '0.88rem', textAlign: 'center', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+          Create a new secure password for your government account.
+        </p>
+
+        {/* Instructions at starting of form (DBIM Annexure B.i) */}
+        <div style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#606060', lineHeight: 1.5 }}>
+          <strong>Instructions:</strong> Fields marked with an asterisk (*) are mandatory. The new password must be at least 8 characters long.
+        </div>
+
         {error && <div className="alert alert-error">{error}</div>}
         {message && <div className="alert alert-success">{message}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="newPassword">New Password</label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="newPassword" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
+              New Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+            </label>
             <input
               type="password"
               id="newPassword"
@@ -109,18 +132,22 @@ export const ResetPasswordPage: React.FC = () => {
               required
               disabled={loading}
               placeholder="Enter new password"
+              style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             />
             {newPassword && (
-              <div className={`password-strength-container ${strengthClass}`}>
+              <div className={`password-strength-container ${strengthClass}`} style={{ marginTop: '4px' }}>
                 <div className="password-strength-bar">
                   <div className="password-strength-fill"></div>
                 </div>
-                <div className="password-strength-label">{strengthLabel}</div>
+                <div className="password-strength-label" style={{ fontSize: '0.78rem' }}>Strength: {strengthLabel}</div>
               </div>
             )}
           </div>
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="confirmPassword" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
+              Confirm Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+            </label>
             <input
               type="password"
               id="confirmPassword"
@@ -129,14 +156,28 @@ export const ResetPasswordPage: React.FC = () => {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               disabled={loading}
-              placeholder="Confirm new password"
+              placeholder="Re-enter new password"
+              style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             />
           </div>
-          <button type="submit" className="btn-primary btn-full" disabled={loading}>
-            {loading ? 'Resetting...' : 'Reset Password'}
+
+          <button
+            type="submit"
+            className="btn-primary btn-full"
+            disabled={loading || !isFormValid}
+            style={{
+              marginTop: '0.5rem',
+              backgroundColor: !isFormValid ? '#E2E8F0' : '#214AAB',
+              color: !isFormValid ? '#64748B' : '#FFFFFF',
+              border: !isFormValid ? '1px solid #CBD5E1' : '1px solid #214AAB',
+              cursor: !isFormValid ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {loading ? 'Updating Password...' : 'Save Password'}
           </button>
         </form>
       </div>
     </div>
-  );
-};
+  )
+}

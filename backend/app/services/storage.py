@@ -71,7 +71,7 @@ class LocalBlobStorage(BlobStorageBackend):
     """Dev-only fallback when S3/MinIO is unavailable."""
 
     def __init__(self, base_path: Optional[str] = None) -> None:
-        self.base_path = Path(base_path or settings.local_blob_path)
+        self.base_path = Path(base_path or settings.blob_storage_path or settings.local_blob_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     def _full_path(self, object_key: str) -> Path:

@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     database_url: str = "sqlite:///./secure_file_sharing.db"
-    # Automatically wipe database tables and users on every deployment startup
-    reset_database_on_startup: bool = True
+    # Keep database tables, users, and blobs persistent across restarts
+    reset_database_on_startup: bool = False
 
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 60
@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "secure-file-blobs"
     s3_region: str = "us-east-1"
 
-    local_blob_path: str = "/tmp/secure-file-blobs"
+    local_blob_path: str = "storage/blobs"
+    blob_storage_path: Optional[str] = None
     max_upload_size_bytes: int = 100 * 1024 * 1024
 
     cors_origins: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"]
