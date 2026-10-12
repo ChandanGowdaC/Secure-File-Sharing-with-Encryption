@@ -17,6 +17,7 @@ from app.schemas.transfers import (
 )
 from app.services.transfers import (
     acknowledge_download as acknowledge_download_service,
+    delete_transfer as delete_transfer_service,
     deliver_transfer as deliver_transfer_service,
     list_pending as list_pending_service,
     list_received as list_received_service,
@@ -51,7 +52,7 @@ def deliver_transfer(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> DeliverTransferResponse:
-    """F.11 – Deliver queued blob to receiver and purge server copy."""
+    """F.11 – Deliver queued blob to receiver without immediately purging until receiver removes."""
     return deliver_transfer_service(db, receiver=current_user, transfer_id=transfer_id)
 
 
@@ -73,4 +74,15 @@ def acknowledge_download(
 ) -> None:
     """F.13/F.14 – Acknowledge successful download and log metadata event."""
     acknowledge_download_service(db, receiver=current_user, transfer_id=transfer_id, success=payload.success)
+
+
+@router.delete("/{transfer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transfer(
+    transfer_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Explicitly remove transfer from inbox and permanently purge encrypted blob from server storage."""
+    delete_transfer_service(db, receiver=current_user, transfer_id=transfer_id)
+
 

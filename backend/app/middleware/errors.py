@@ -17,12 +17,13 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
         # TODO: log exc.internal_detail to Metadata / Log DB without exposing crypto material
-        return JSONResponse(status_code=exc.status_code, content={"error": exc.message})
+        return JSONResponse(status_code=exc.status_code, content={"error": exc.message, "detail": exc.message})
 
     @app.exception_handler(NotImplementedError)
     async def not_implemented_handler(_: Request, __: NotImplementedError) -> JSONResponse:
-        return JSONResponse(status_code=501, content={"error": "Endpoint not yet implemented."})
+        return JSONResponse(status_code=501, content={"error": "Endpoint not yet implemented.", "detail": "Endpoint not yet implemented."})
 
     @app.exception_handler(Exception)
     async def generic_error_handler(_: Request, __: Exception) -> JSONResponse:
-        return JSONResponse(status_code=500, content={"error": "An unexpected error occurred."})
+        return JSONResponse(status_code=500, content={"error": "An unexpected error occurred.", "detail": "An unexpected error occurred."})
+

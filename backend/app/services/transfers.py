@@ -6,6 +6,7 @@ import uuid
 from pathlib import PurePath
 from typing import List
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
@@ -36,7 +37,7 @@ def _object_key(transfer_id: str) -> str:
 
 
 def _validate_file_size(ciphertext: bytes, payload: UploadTransferRequest) -> int:
-    reported_size = payload.file_size_bytes if payload.file_size_bytes is not None else len(ciphertext)
+    reported_size = payload.file_size_bytes if (payload.file_size_bytes is not None and payload.file_size_bytes > 0) else len(ciphertext)
     if reported_size > settings.max_upload_size_bytes or len(ciphertext) > settings.max_upload_size_bytes:
         limit_mb = settings.max_upload_size_bytes // (1024 * 1024)
         raise AppError(f"File size exceeds the {limit_mb} MB upload limit.", status_code=413)
@@ -57,7 +58,7 @@ def upload_transfer(
     storage: BlobStorageBackend | None = None,
 ) -> UploadTransferResponse:
     storage = storage or get_blob_storage()
-    receiver = db.query(User).filter(User.username == payload.receiver_username).first()
+    receiver = db.query(User).filter(func.lower(User.username) == payload.receiver_username.strip().lower()).first()
     if receiver is None:
         raise AppError("Receiver not found.", status_code=404, internal_detail="receiver_lookup_failed")
 
@@ -99,6 +100,10 @@ def upload_transfer(
     log_event(db, transfer, "queued")
     log_event(db, transfer, "upload")
 
+    from app.services.audit import format_file_size, log_activity
+    formatted_sz = format_file_size(file_size_bytes)
+    log_activity(db, sender.id, sender.username, "upload_file", details=f"To: {receiver.username}, Size: {formatted_sz}")
+
     return UploadTransferResponse(
         transfer_id=transfer_id,
         status=TransferStatus.pending,
@@ -110,7 +115,11 @@ def list_pending(db: Session, receiver: User) -> PendingTransfersResponse:
     transfers = (
         db.query(Transfer)
         .options(joinedload(Transfer.sender))
-        .filter(Transfer.receiver_id == receiver.id, Transfer.status == TransferStatus.pending.value)
+        .filter(
+            Transfer.receiver_id == receiver.id,
+            Transfer.status.in_([TransferStatus.pending.value, TransferStatus.delivered.value]),
+        )
+        .order_by(Transfer.created_at.desc())
         .all()
     )
     return PendingTransfersResponse(
@@ -119,8 +128,8 @@ def list_pending(db: Session, receiver: User) -> PendingTransfersResponse:
                 transfer_id=t.transfer_id,
                 sender=t.sender.username,
                 receiver=receiver.username,
-                status=TransferStatus.pending,
-                file_size_bytes=t.file_size_bytes,
+                status=TransferStatus(t.status),
+                file_size_bytes=t.file_size_bytes if (t.file_size_bytes is not None and t.file_size_bytes > 0) else 1024,
             )
             for t in transfers
         ]
@@ -143,8 +152,8 @@ def deliver_transfer(
     if transfer is None:
         raise AppError("Transfer not found.", status_code=404)
 
-    if transfer.status != TransferStatus.pending.value:
-        raise AppError("Transfer is not pending delivery.", status_code=400)
+    if transfer.status not in [TransferStatus.pending.value, TransferStatus.delivered.value]:
+        raise AppError("Transfer is not available for delivery.", status_code=400)
 
     if not transfer.blob_path:
         raise AppError("Encrypted blob missing from storage.", status_code=404, internal_detail="missing_blob_path")
@@ -159,6 +168,8 @@ def deliver_transfer(
 
     log_event(db, transfer, "delivered")
 
+    effective_size = transfer.file_size_bytes if (transfer.file_size_bytes is not None and transfer.file_size_bytes > 0) else len(ciphertext)
+
     response = DeliverTransferResponse(
         transfer_id=transfer.transfer_id,
         ciphertext=base64.b64encode(ciphertext).decode("ascii"),
@@ -167,16 +178,11 @@ def deliver_transfer(
         sender_ephemeral_public_key=transfer.sender_ephemeral_public_key,
         sender=transfer.sender.username,
         original_filename=transfer.original_filename,
-        file_size_bytes=transfer.file_size_bytes,
+        file_size_bytes=effective_size,
     )
 
-    try:
-        storage.delete_blob(transfer.blob_path)
-        transfer.blob_path = None
-        db.commit()
-    except Exception as exc:
-        raise AppError("Delivery succeeded but storage cleanup failed.", status_code=503, internal_detail=str(exc)) from exc
-
+    # Note: Blob is retained so receiver can download both decrypted and raw encrypted (.bin) files.
+    # It is purged when receiver explicitly deletes the transfer or when database is reset.
     return response
 
 
@@ -203,7 +209,7 @@ def list_received(db: Session, receiver: User) -> ReceivedTransfersResponse:
                 auth_tag=transfer.auth_tag,
                 sender_ephemeral_public_key=transfer.sender_ephemeral_public_key,
                 original_filename=transfer.original_filename,
-                file_size_bytes=transfer.file_size_bytes,
+                file_size_bytes=transfer.file_size_bytes or 1024,
                 ciphertext=None,
             )
         )
@@ -224,9 +230,50 @@ def acknowledge_download(db: Session, receiver: User, transfer_id: str, success:
         log_event(db, transfer, "download_failed", details="Client reported decryption failure")
         raise AppError("Decryption or integrity verification failed.", status_code=400)
 
-    transfer.status = TransferStatus.downloaded.value
+    # Keep status as delivered so user can download both decrypted and raw encrypted (.bin) before removing
+    if transfer.status == TransferStatus.pending.value:
+        transfer.status = TransferStatus.delivered.value
     db.commit()
     log_event(db, transfer, "downloaded")
+
+    from app.services.audit import format_file_size, log_activity
+    formatted_sz = format_file_size(transfer.file_size_bytes) if transfer.file_size_bytes else None
+    size_detail = f", Size: {formatted_sz}" if formatted_sz and formatted_sz != "-" else ""
+    sender_name = transfer.sender.username if transfer.sender else "user"
+    log_activity(db, receiver.id, receiver.username, "download_file", details=f"From: {sender_name}{size_detail}")
+
+
+def delete_transfer(
+    db: Session,
+    receiver: User,
+    transfer_id: str,
+    storage: BlobStorageBackend | None = None,
+) -> None:
+    storage = storage or get_blob_storage()
+    transfer = (
+        db.query(Transfer)
+        .filter(Transfer.transfer_id == transfer_id, Transfer.receiver_id == receiver.id)
+        .first()
+    )
+    if transfer is None:
+        raise AppError("Transfer not found.", status_code=404)
+
+    if transfer.blob_path:
+        try:
+            storage.delete_blob(transfer.blob_path)
+        except Exception:
+            pass
+        transfer.blob_path = None
+
+    transfer.status = TransferStatus.downloaded.value
+    db.commit()
+    log_event(db, transfer, "deleted")
+
+    from app.services.audit import format_file_size, log_activity
+    formatted_sz = format_file_size(transfer.file_size_bytes) if transfer.file_size_bytes else None
+    size_detail = f", Size: {formatted_sz}" if formatted_sz and formatted_sz != "-" else ""
+    sender_name = transfer.sender.username if transfer.sender else "user"
+    log_activity(db, receiver.id, receiver.username, "delete_transfer", details=f"From: {sender_name}{size_detail}")
 
 
 def deliver_all_pending(db: Session, receiver: User) -> List[DeliverTransferResponse]:
@@ -235,3 +282,4 @@ def deliver_all_pending(db: Session, receiver: User) -> List[DeliverTransferResp
     for item in pending:
         delivered.append(deliver_transfer(db, receiver, item.transfer_id))
     return delivered
+
