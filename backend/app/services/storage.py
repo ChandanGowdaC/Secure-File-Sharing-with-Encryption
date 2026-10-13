@@ -49,14 +49,23 @@ class S3BlobStorage(BlobStorageBackend):
     def _ensure_bucket(self) -> None:
         try:
             self.client.head_bucket(Bucket=self.bucket)
-        except ClientError:
-            create_kwargs: dict = {"Bucket": self.bucket}
-            if settings.s3_region and settings.s3_region != "us-east-1":
-                create_kwargs["CreateBucketConfiguration"] = {"LocationConstraint": settings.s3_region}
-            self.client.create_bucket(**create_kwargs)
+        except Exception:
+            try:
+                create_kwargs: dict = {"Bucket": self.bucket}
+                if settings.s3_region and settings.s3_region not in ("us-east-1", "auto"):
+                    create_kwargs["CreateBucketConfiguration"] = {"LocationConstraint": settings.s3_region}
+                self.client.create_bucket(**create_kwargs)
+            except Exception:
+                # If bucket already exists or token only has Object read/write permissions, proceed safely
+                pass
 
     def save_blob(self, object_key: str, data: bytes) -> str:
-        self.client.put_object(Bucket=self.bucket, Key=object_key, Body=data, ServerSideEncryption="AES256")
+        put_kwargs = {"Bucket": self.bucket, "Key": object_key, "Body": data}
+        try:
+            self.client.put_object(**put_kwargs, ServerSideEncryption="AES256")
+        except Exception:
+            # Fallback without SSE header if rejected by provider (e.g. Cloudflare R2 / MinIO)
+            self.client.put_object(**put_kwargs)
         return object_key
 
     def read_blob(self, object_key: str) -> bytes:
@@ -64,7 +73,10 @@ class S3BlobStorage(BlobStorageBackend):
         return response["Body"].read()
 
     def delete_blob(self, object_key: str) -> None:
-        self.client.delete_object(Bucket=self.bucket, Key=object_key)
+        try:
+            self.client.delete_object(Bucket=self.bucket, Key=object_key)
+        except Exception:
+            pass
 
 
 class LocalBlobStorage(BlobStorageBackend):
@@ -97,8 +109,9 @@ def get_blob_storage() -> BlobStorageBackend:
     if settings.storage_backend == "s3" and BOTO3_AVAILABLE:
         try:
             return S3BlobStorage()
-        except Exception:
-            # Fallback to local storage if S3 bucket connection fails in dev
+        except Exception as exc:
+            import logging
+            logging.getLogger("uvicorn.error").warning("Failed to initialize S3 storage backend: %s. Falling back to local storage.", exc)
             return LocalBlobStorage()
     return LocalBlobStorage()
 

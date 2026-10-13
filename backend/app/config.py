@@ -23,13 +23,13 @@ class Settings(BaseSettings):
     frontend_url: str = "https://secure-file-sharing-with-encryption-tau.vercel.app"
 
     # Object storage – encrypted blobs never live in the repo tree
-    # Use "s3" with MinIO locally or AWS S3 in production; "local" is dev-only fallback
-    storage_backend: Literal["s3", "local"] = "local"
-    s3_endpoint_url: Optional[str] = "http://localhost:9000"
-    s3_access_key_id: str = "minioadmin"
-    s3_secret_access_key: str = "minioadmin"
-    s3_bucket_name: str = "secure-file-blobs"
-    s3_region: str = "us-east-1"
+    # Backblaze B2 (100% free forever, S3-compatible, no credit card required)
+    storage_backend: Literal["s3", "local"] = "s3"
+    s3_endpoint_url: Optional[str] = "https://s3.us-east-005.backblazeb2.com"
+    s3_access_key_id: str = "005ebfbd19cd8f80000000001"
+    s3_secret_access_key: str = "K0053VwL457PkobnnPOqlz8IWU2zQKI"
+    s3_bucket_name: str = "sfs-blobs-chandangowdac"
+    s3_region: str = "us-east-005"
 
     local_blob_path: str = "storage/blobs"
     blob_storage_path: Optional[str] = None

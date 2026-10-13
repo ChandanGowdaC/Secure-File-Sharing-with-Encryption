@@ -17,7 +17,17 @@ services:
       - key: SECRET_KEY
         sync: false
       - key: STORAGE_BACKEND
-        value: "local"
+        value: "s3"
+      - key: S3_ENDPOINT_URL
+        value: "https://s3.us-east-005.backblazeb2.com"
+      - key: S3_ACCESS_KEY_ID
+        value: "005ebfbd19cd8f80000000001"
+      - key: S3_SECRET_ACCESS_KEY
+        value: "K0053VwL457PkobnnPOqlz8IWU2zQKI"
+      - key: S3_BUCKET_NAME
+        value: "sfs-blobs-chandangowdac"
+      - key: S3_REGION
+        value: "us-east-005"
       - key: CORS_ORIGINS
         value: '["*"]'
       - key: FRONTEND_URL
