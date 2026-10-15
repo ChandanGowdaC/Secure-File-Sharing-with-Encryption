@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { api, setAuthToken } from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 
 interface LoginPageProps {
   onLoginSuccess: (username: string, isAdmin?: boolean, lastLoginAt?: string | null) => void
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+  const { t } = useLanguage()
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -60,8 +62,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         setMfaNotice(
           res.message ||
             (res.masked_email
-              ? `A 6-digit verification code has been sent to ${res.masked_email}`
-              : 'A 6-digit verification code has been sent to your registered email.')
+              ? t(`A 6-digit verification code has been sent to ${res.masked_email}`, `6-अंकीय सत्यापन कोड ${res.masked_email} पर भेज दिया गया है`)
+              : t('A 6-digit verification code has been sent to your registered email.', 'आपके पंजीकृत ईमेल पर 6-अंकीय सत्यापन कोड भेजा गया है।'))
         )
       } else if (res.session_token) {
         setAuthToken(res.session_token)
@@ -70,7 +72,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         navigate('/upload')
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please verify credentials.')
+      setError(err.message || t('Authentication failed. Please verify credentials.', 'प्रमाणीकरण विफल। कृपया क्रेडेंशियल्स सत्यापित करें।'))
     } finally {
       setLoading(false)
     }
@@ -82,7 +84,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     const trimmedCode = mfaCode.trim()
     if (trimmedCode.length < 6) {
-      setError('Please enter the complete 6-digit verification code.')
+      setError(t('Please enter the complete 6-digit verification code.', 'कृपया पूरा 6-अंकीय सत्यापन कोड दर्ज करें।'))
       return
     }
 
@@ -102,10 +104,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         onLoginSuccess(loggedUsername, !!res.is_admin, res.last_login_at)
         navigate('/upload')
       } else {
-        setError('Verification failed. Please try again.')
+        setError(t('Verification failed. Please try again.', 'सत्यापन विफल। कृपया पुनः प्रयास करें।'))
       }
     } catch (err: any) {
-      setError(err.message || 'Invalid or expired 6-digit verification code.')
+      setError(err.message || t('Invalid or expired 6-digit verification code.', 'अमान्य या समाप्त हो चुका 6-अंकीय सत्यापन कोड।'))
     } finally {
       setLoading(false)
     }
@@ -137,10 +139,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       if (res.mfa_challenge_token) {
         setMfaChallengeToken(res.mfa_challenge_token)
       }
-      setMfaNotice(res.message || 'A new verification code has been dispatched to your email.')
+      setMfaNotice(res.message || t('A new verification code has been dispatched to your email.', 'एक नया सत्यापन कोड आपके ईमेल पर भेज दिया गया है।'))
       setResendCooldown(30)
     } catch (err: any) {
-      setError(err.message || 'Failed to resend code. Please try again.')
+      setError(err.message || t('Failed to resend code. Please try again.', 'कोड पुनः भेजने में विफल। कृपया पुनः प्रयास करें।'))
     } finally {
       setResending(false)
     }
@@ -150,37 +152,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
-      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      {/* Breadcrumb Trail */}
       <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
-        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>{t('Home', 'होम')}</Link>
         <span style={{ margin: '0 0.5rem' }}>/</span>
-        <span style={{ color: '#150202', fontWeight: 600 }}>Sign In</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>{t('Sign In', 'साइन इन')}</span>
       </nav>
 
       <div className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#162F6A', textAlign: 'center', margin: '0 0 0.5rem' }}>
-          {mfaChallengeToken ? 'Two-Factor Authentication' : 'Sign In to Portal'}
+          {mfaChallengeToken ? t('Two-Factor Authentication', 'दो-चरणीय प्रमाणीकरण') : t('Sign In to Portal', 'पोर्टल में साइन इन करें')}
         </h1>
         <p style={{ color: '#606060', fontSize: '0.88rem', textAlign: 'center', marginBottom: '1.5rem', lineHeight: 1.5 }}>
           {mfaChallengeToken
-            ? 'Enter the 6-digit one-time passcode sent to your registered official email.'
-            : 'Access zero-knowledge encrypted file transfers and browser cryptographic identity.'}
+            ? t('Enter the 6-digit one-time passcode sent to your registered official email.', 'अपने पंजीकृत आधिकारिक ईमेल पर भेजा गया 6-अंकीय ओटीपी दर्ज करें।')
+            : t('Access zero-knowledge encrypted file transfers and browser cryptographic identity.', 'ज़ीरो-नॉलेज एन्क्रिप्टेड फ़ाइल ट्रांसफर और क्रिप्टोग्राफ़िक पहचान का उपयोग करें।')}
         </p>
 
-        {/* Instructions at the starting of form (DBIM Annexure B.i, Page 109/129) */}
+        {/* Instructions at the starting of form */}
         <div style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#606060', lineHeight: 1.5 }}>
-          <strong>Instructions:</strong> Please fill in all mandatory fields marked with an asterisk (*). Ensure your browser supports IndexedDB for private key storage.
+          <strong>{t('Instructions:', 'निर्देश:')}</strong> {t('Please fill in all mandatory fields marked with an asterisk (*). Ensure your browser supports IndexedDB for private key storage.', 'कृपया तारांकन (*) से चिह्नित सभी अनिवार्य फ़ील्ड भरें। सुनिश्चित करें कि आपका ब्राउज़र निजी कुंजी भंडारण के लिए IndexedDB का समर्थन करता है।')}
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
         {mfaNotice && <div className="alert alert-info">{mfaNotice}</div>}
 
         {mfaChallengeToken ? (
-          /* MFA Verification Form (Annexure B - Single column vertical layout) */
+          /* MFA Verification Form */
           <form onSubmit={handleMfaSubmit}>
             <div className="form-group" style={{ textAlign: 'center' }}>
               <label htmlFor="mfa-input" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#150202', fontSize: '0.9rem' }}>
-                6-Digit Verification Code <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+                {t('6-Digit Verification Code', '6-अंकीय सत्यापन कोड')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
               </label>
 
               <div className="otp-input-wrap">
@@ -225,10 +227,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   }}
                 >
                   {resending
-                    ? 'Resending...'
+                    ? t('Resending...', 'पुनः भेजा जा रहा है...')
                     : resendCooldown > 0
-                    ? `Resend Code (${resendCooldown}s)`
-                    : 'Resend Code'}
+                    ? `${t('Resend Code', 'कोड पुनः भेजें')} (${resendCooldown}s)`
+                    : t('Resend Code', 'कोड पुनः भेजें')}
                 </button>
                 <button
                   type="button"
@@ -236,16 +238,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   className="btn-secondary"
                   style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', borderRadius: '6px' }}
                 >
-                  Paste from Clipboard
+                  {t('Paste from Clipboard', 'क्लिपबोर्ड से पेस्ट करें')}
                 </button>
               </div>
 
               <span className="field-help" style={{ display: 'block', color: '#606060', fontSize: '0.8rem' }}>
-                Check your inbox and spam folder for the one-time passcode.
+                {t('Check your inbox and spam folder for the one-time passcode.', 'वन-टाइम पासकोड के लिए अपना इनबॉक्स और स्पैम फ़ोल्डर जांचें।')}
               </span>
             </div>
 
-            {/* Primary Action Button - disabled until complete 6 digits entered (Annexure B.xiv) */}
             <button
               type="submit"
               disabled={loading || mfaCode.length < 6}
@@ -257,10 +258,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 cursor: mfaCode.length < 6 ? 'not-allowed' : 'pointer',
               }}
             >
-              {loading ? 'Verifying...' : 'Verify Code & Sign In'}
+              {loading ? t('Verifying...', 'सत्यापन हो रहा है...') : t('Verify Code & Sign In', 'कोड सत्यापित करें और साइन इन करें')}
             </button>
 
-            {/* Secondary Action Button with less visual weight (Annexure B.xiii) */}
             <button
               type="button"
               className="btn-secondary btn-full"
@@ -271,29 +271,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 setMfaCode('')
               }}
             >
-              Back to Sign In
+              {t('Back to Sign In', 'साइन इन पर वापस जाएं')}
             </button>
           </form>
         ) : (
-          /* Login Form (Annexure B - Single column vertical layout, Figure 81) */
+          /* Login Form */
           <form onSubmit={handleLoginSubmit}>
             {/* Field 1: Username or Email */}
             <div className="form-group">
               <label htmlFor="login-username" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px' }}>
-                Username or Official Email <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+                {t('Username or Official Email', 'उपयोगकर्ता नाम या आधिकारिक ईमेल')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
               </label>
               <input
                 id="login-username"
                 type="text"
                 required
                 className="form-control"
-                placeholder="e.g. officer@nic.in or username"
+                placeholder={t('e.g. student@nitk.edu.in or username', 'उदा. student@nitk.edu.in या उपयोगकर्ता नाम')}
                 value={usernameOrEmail}
                 onChange={e => setUsernameOrEmail(e.target.value)}
                 style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
               />
               <span className="field-help" style={{ color: '#606060', fontSize: '0.78rem', marginTop: '2px' }}>
-                Enter your registered government username or email address.
+                {t('Enter your registered portal username or email address.', 'अपना पंजीकृत पोर्टल उपयोगकर्ता नाम या ईमेल पता दर्ज करें।')}
               </span>
             </div>
 
@@ -301,10 +301,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <div className="form-group" style={{ marginTop: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <label htmlFor="login-password" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202' }}>
-                  Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+                  {t('Password', 'पासवर्ड')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
                 </label>
                 <Link to="/forgot-password" className="forgot-password-link" style={{ fontSize: '0.8rem', color: '#214AAB' }}>
-                  Forgot Password?
+                  {t('Forgot Password?', 'पासवर्ड भूल गए?')}
                 </Link>
               </div>
 
@@ -314,7 +314,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   type={showPassword ? 'text' : 'password'}
                   required
                   className="form-control"
-                  placeholder="Enter your secure password"
+                  placeholder={t('Enter your secure password', 'अपना सुरक्षित पासवर्ड दर्ज करें')}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   style={{ width: '100%', paddingRight: '45px', backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
@@ -322,7 +322,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('Hide password', 'पासवर्ड छिपाएं') : t('Show password', 'पासवर्ड दिखाएं')}
                   style={{
                     position: 'absolute',
                     right: '12px',
@@ -334,17 +334,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     alignItems: 'center',
                     padding: '4px',
                   }}
-                  title={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? t('Hide password', 'पासवर्ड छिपाएं') : t('Show password', 'पासवर्ड दिखाएं')}
                 >
                   {showPassword ? '👁️' : '👁️‍🗨️'}
                 </button>
               </div>
               <span className="field-help" style={{ color: '#606060', fontSize: '0.78rem', marginTop: '2px' }}>
-                Case-sensitive alphanumeric password.
+                {t('Case-sensitive alphanumeric password.', 'केस-संवेदी अक्षरांकीय पासवर्ड।')}
               </span>
             </div>
 
-            {/* Primary Action Button - disabled until fields entered (Annexure B.xiv) */}
             <button
               type="submit"
               disabled={loading || !isFormValid}
@@ -359,15 +358,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 transition: 'all 0.2s ease',
               }}
             >
-              {loading ? 'Authenticating...' : 'Sign In'}
+              {loading ? t('Authenticating...', 'प्रमाणीकरण हो रहा है...') : t('Sign In', 'साइन इन करें')}
             </button>
           </form>
         )}
 
         <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid #EBEAEA', textAlign: 'center', fontSize: '0.85rem', color: '#606060' }}>
-          Don&apos;t have a registered cryptographic identity?{' '}
+          {t("Don't have a registered cryptographic identity? ", 'क्या आपकी पंजीकृत क्रिप्टोग्राफ़िक पहचान नहीं है? ')}
           <Link to="/register" style={{ color: '#214AAB', fontWeight: 600, textDecoration: 'none' }}>
-            Register New Account
+            {t('Register New Account', 'नया खाता पंजीकृत करें')}
           </Link>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { generateEphemeralKeyPair } from '../crypto/keypair'
 import { deriveTransferKey } from '../crypto/hkdf'
 import { encryptFile } from '../crypto/aes-gcm'
 import { IconUpload, IconLock } from '../components/LineIcons'
+import { useLanguage } from '../context/LanguageContext'
 
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
 const SUPPORTED_EXTENSIONS = [
@@ -20,6 +21,7 @@ function formatFileSize(bytes: number) {
 }
 
 export const UploadPage: React.FC = () => {
+  const { t } = useLanguage()
   const [receiverUsername, setReceiverUsername] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -34,12 +36,22 @@ export const UploadPage: React.FC = () => {
     const extension = selectedFile.name.split('.').pop()?.toLowerCase()
     if (!extension || !SUPPORTED_EXTENSIONS.includes(extension)) {
       setFile(null)
-      setError(`"${selectedFile.name}" is not supported. Supported: ${SUPPORTED_FORMATS_LABEL}`)
+      setError(
+        t(
+          `"${selectedFile.name}" is not supported. Supported: ${SUPPORTED_FORMATS_LABEL}`,
+          `"${selectedFile.name}" समर्थित नहीं है। समर्थित प्रारूप: ${SUPPORTED_FORMATS_LABEL}`
+        )
+      )
       return
     }
     if (selectedFile.size > MAX_UPLOAD_SIZE_BYTES) {
       setFile(null)
-      setError(`File size is ${formatFileSize(selectedFile.size)}. Maximum allowed size is 100 MB.`)
+      setError(
+        t(
+          `File size is ${formatFileSize(selectedFile.size)}. Maximum allowed size is 100 MB.`,
+          `फ़ाइल का आकार ${formatFileSize(selectedFile.size)} है। अधिकतम अनुमत आकार 100 MB है।`
+        )
+      )
       return
     }
     setFile(selectedFile)
@@ -85,29 +97,50 @@ export const UploadPage: React.FC = () => {
 
     setLoading(true)
     setError(null)
-    setStatusMsg('Step 1/4: Looking up receiver public key...')
+    setStatusMsg(t('Step 1/4: Looking up receiver public key...', 'चरण 1/4: प्राप्तकर्ता की सार्वजनिक कुंजी खोजी जा रही है...'))
 
     try {
       // 1. Fetch receiver's long-term public key
       const keyRes = await api.auth.lookupPublicKey({ username: receiverUsername.trim() })
       if (!keyRes.found || !keyRes.public_key) {
-        throw new Error(`Receiver "${receiverUsername.trim()}" not found or has no public key registered.`)
+        throw new Error(
+          t(
+            `Receiver "${receiverUsername.trim()}" not found or has no public key registered.`,
+            `प्राप्तकर्ता "${receiverUsername.trim()}" नहीं मिला या कोई सार्वजनिक कुंजी पंजीकृत नहीं है।`
+          )
+        )
       }
 
-      setStatusMsg('Step 2/4: Generating ephemeral DH keypair & deriving AES-256-GCM key...')
+      setStatusMsg(
+        t(
+          'Step 2/4: Generating ephemeral DH keypair & deriving AES-256-GCM key...',
+          'चरण 2/4: क्षणिक DH कुंजी युग्म उत्पन्न करना और AES-256-GCM कुंजी व्युत्पन्न करना...'
+        )
+      )
       // 2. Generate ephemeral key pair
       const ephemeralKeypair = await generateEphemeralKeyPair()
 
-      // 3. Derive 256-bit transfer key using HKDF-SHA256
-      const transferKey = await deriveTransferKey(ephemeralKeypair.privateKey, keyRes.public_key)
+      // 3. Derive 256-bit AES key via HKDF
+      const transferKey = await deriveTransferKey(
+        ephemeralKeypair.privateKey,
+        keyRes.public_key
+      )
 
-      // 4. Read file bytes and encrypt with AES-256-GCM
-      setStatusMsg('Step 3/4: Encrypting file client-side...')
-      const fileBuffer = await file.arrayBuffer()
-      const { ciphertext, nonce, authTag } = await encryptFile(fileBuffer, transferKey)
+      setStatusMsg(
+        t(
+          'Step 3/4: Encrypting file locally with AES-256-GCM...',
+          'चरण 3/4: AES-256-GCM के साथ स्थानीय रूप से फ़ाइल एन्क्रिप्ट की जा रही है...'
+        )
+      )
+      const arrayBuffer = await file.arrayBuffer()
+      const { ciphertext, nonce, authTag } = await encryptFile(arrayBuffer, transferKey)
 
-      // 5. Send payload to server
-      setStatusMsg('Step 4/4: Uploading encrypted ciphertext to sovereign server...')
+      setStatusMsg(
+        t(
+          'Step 4/4: Uploading ciphertext blob to secure queue...',
+          'चरण 4/4: सिफ़रटेक्स्ट ब्लॉब सुरक्षित कतार में अपलोड किया जा रहा है...'
+        )
+      )
       const uploadRes = await api.transfers.upload({
         receiver_username: receiverUsername.trim(),
         ciphertext,
@@ -118,14 +151,19 @@ export const UploadPage: React.FC = () => {
         file_size_bytes: file.size,
       })
 
-      setStatusMsg(`Success! Encrypted file "${file.name}" queued for recipient. Transfer ID: ${uploadRes.transfer_id}`)
+      setStatusMsg(
+        t(
+          `Success! Encrypted file "${file.name}" queued for recipient. Transfer ID: ${uploadRes.transfer_id}`,
+          `सफलता! एन्क्रिप्टेड फ़ाइल "${file.name}" प्राप्तकर्ता के लिए कतारबद्ध है। स्थानांतरण आईडी: ${uploadRes.transfer_id}`
+        )
+      )
       setFile(null)
       setReceiverUsername('')
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
     } catch (err: any) {
-      setError(err.message || 'Encryption or upload failed.')
+      setError(err.message || t('Encryption or upload failed.', 'एन्क्रिप्शन या अपलोड विफल रहा।'))
     } finally {
       setLoading(false)
     }
@@ -135,11 +173,11 @@ export const UploadPage: React.FC = () => {
 
   return (
     <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
-      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      {/* Breadcrumb Trail */}
       <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
-        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>{t('Home', 'होम')}</Link>
         <span style={{ margin: '0 0.5rem' }}>/</span>
-        <span style={{ color: '#150202', fontWeight: 600 }}>Encrypted Upload</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>{t('Encrypted Upload', 'एन्क्रिप्टेड अपलोड')}</span>
       </nav>
 
       <div className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
@@ -160,16 +198,23 @@ export const UploadPage: React.FC = () => {
             <IconUpload size={32} color="#162F6A" />
           </div>
           <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.35rem' }}>
-            Send Encrypted File
+            {t('Send Encrypted File', 'एन्क्रिप्टेड फ़ाइल भेजें')}
           </h1>
           <p style={{ color: '#606060', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto', lineHeight: 1.5 }}>
-            End-to-end encrypted with AES-256-GCM. Files are encrypted client-side in your browser before transmission.
+            {t(
+              'End-to-end encrypted with AES-256-GCM. Files are encrypted client-side in your browser before transmission.',
+              'AES-256-GCM के साथ एंड-टू-एंड एन्क्रिप्टेड। ट्रांसमिशन से पहले फ़ाइलें आपके ब्राउज़र में क्लाइंट-साइड एन्क्रिप्ट की जाती हैं।'
+            )}
           </p>
         </div>
 
-        {/* Instructions at starting of form (DBIM Annexure B.i, Page 109/129) */}
+        {/* Instructions at starting of form */}
         <div style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#606060', lineHeight: 1.5 }}>
-          <strong>Instructions:</strong> Enter the recipient&apos;s registered username and select a file to encrypt. Both fields marked with an asterisk (*) are mandatory. Maximum file size is 100 MB.
+          <strong>{t('Instructions:', 'निर्देश:')}</strong>{' '}
+          {t(
+            "Enter the recipient's registered username and select a file to encrypt. Both fields marked with an asterisk (*) are mandatory. Maximum file size is 100 MB.",
+            'प्राप्तकर्ता का पंजीकृत उपयोगकर्ता नाम दर्ज करें और एन्क्रिप्ट करने के लिए एक फ़ाइल चुनें। तारांकन (*) से चिह्नित दोनों फ़ील्ड अनिवार्य हैं। अधिकतम फ़ाइल आकार 100 MB है।'
+          )}
         </div>
 
         {error && (
@@ -184,69 +229,90 @@ export const UploadPage: React.FC = () => {
           </div>
         )}
 
-        {/* Form (Annexure B - Single vertical column layout, Figure 81) */}
+        {/* Form */}
         <form onSubmit={handleUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Field 1: Recipient Username */}
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="receiverUsername" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
-              Recipient Username <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+              {t('Recipient Username', 'प्राप्तकर्ता उपयोगकर्ता नाम')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
             </label>
             <input
               id="receiverUsername"
               type="text"
               required
               className="form-control"
-              placeholder="e.g. bob or officer_id"
+              placeholder={t('e.g. bob or user_id', 'उदा. bob या user_id')}
               value={receiverUsername}
               onChange={e => setReceiverUsername(e.target.value)}
               style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             />
             <span className="field-help" style={{ color: '#606060', fontSize: '0.78rem', marginTop: '2px', display: 'block' }}>
-              The portal looks up the recipient&apos;s registered public key to establish ECDH agreement.
+              {t(
+                "The portal looks up the recipient's registered public key to establish DH agreement.",
+                'पोर्टल DH समझौते को स्थापित करने के लिए प्राप्तकर्ता की पंजीकृत सार्वजनिक कुंजी देखता है।'
+              )}
             </span>
           </div>
 
           {/* Field 2: File to Encrypt */}
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="file-upload-input" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
-              File to Encrypt <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+              {t('File to Encrypt', 'एन्क्रिप्ट करने के लिए फ़ाइल')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
             </label>
 
             {file ? (
-              <div className="file-selected-card" style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem 1rem' }}>
-                <div className="file-selected-info">
-                  <span className="file-selected-badge" style={{ background: '#D2DFFF', color: '#162F6A' }}>
-                    {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
-                  </span>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="file-selected-name" title={file.name} style={{ color: '#150202', fontWeight: 600 }}>{file.name}</div>
-                    <div className="file-selected-size" style={{ color: '#606060', fontSize: '0.8rem' }}>{formatFileSize(file.size)}</div>
+              <div
+                style={{
+                  border: '1px solid #162F6A',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
+                  <div style={{ background: '#EEF2FF', padding: '0.5rem', borderRadius: '6px' }}>
+                    📄
+                  </div>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontWeight: 600, color: '#162F6A', fontSize: '0.92rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {file.name}
+                    </div>
+                    <div style={{ color: '#606060', fontSize: '0.78rem' }}>
+                      {formatFileSize(file.size)}
+                    </div>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="file-remove-btn"
                   onClick={handleClearFile}
-                  title="Remove file"
-                  aria-label="Remove file"
-                  style={{ color: '#DC3545' }}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #C6C6C6',
+                    borderRadius: '4px',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.8rem',
+                    color: '#DC3545',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
-                  &times;
+                  {t('Remove', 'हटाएं')}
                 </button>
               </div>
             ) : (
               <div
-                className={`file-dropzone ${isDragging ? 'dragging' : ''}`}
-                onClick={() => fileInputRef.current?.click()}
+                className={`file-dropzone ${isDragging ? 'drag-over' : ''}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
+                onClick={() => fileInputRef.current?.click()}
                 style={{
-                  border: '2px dashed #CBD5E1',
-                  borderRadius: '10px',
+                  border: '2px dashed #C6C6C6',
+                  borderRadius: '8px',
                   padding: '2rem 1.5rem',
                   textAlign: 'center',
                   backgroundColor: '#F8FAFC',
@@ -278,18 +344,20 @@ export const UploadPage: React.FC = () => {
                 </div>
                 <div>
                   <div className="file-dropzone-text" style={{ color: '#150202', fontWeight: 600, fontSize: '0.92rem' }}>
-                    Click to select file, or drag and drop here
+                    {t('Click to select file, or drag and drop here', 'फ़ाइल चुनने के लिए क्लिक करें, या यहां खींचें और छोड़ें')}
                   </div>
                   <div className="file-dropzone-sub" style={{ color: '#606060', fontSize: '0.8rem', marginTop: '4px' }}>
-                    Supports {SUPPORTED_FORMATS_LABEL} up to 100 MB
+                    {t(
+                      `Supports ${SUPPORTED_FORMATS_LABEL} up to 100 MB`,
+                      `100 MB तक ${SUPPORTED_FORMATS_LABEL} समर्थित`
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Primary Action Button - disabled until valid data entered (Annexure B.xiv)
-              Short label max 3 words (Section 4.5 i): "Encrypt & Upload" */}
+          {/* Primary Action Button */}
           <button
             type="submit"
             disabled={loading || !isFormValid}
@@ -311,11 +379,11 @@ export const UploadPage: React.FC = () => {
             }}
           >
             {loading ? (
-              <span>Processing &amp; Encrypting...</span>
+              <span>{t('Processing & Encrypting...', 'प्रसंस्करण एवं एन्क्रिप्ट किया जा रहा है...')}</span>
             ) : (
               <>
                 <IconLock size={20} color={!isFormValid ? '#64748B' : '#FFFFFF'} />
-                <span>Encrypt &amp; Upload</span>
+                <span>{t('Encrypt & Upload', 'एन्क्रिप्ट करें और भेजें')}</span>
               </>
             )}
           </button>

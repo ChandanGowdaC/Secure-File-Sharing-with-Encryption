@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useLanguage } from '../context/LanguageContext'
 
 export interface AccessibilityState {
   contrast: 'light' | 'high'
@@ -10,12 +11,13 @@ export interface AccessibilityState {
   largeCursor: boolean
 }
 
-const STORAGE_KEY = 'gov_dbim_accessibility_settings'
+const STORAGE_KEY = 'sfs_accessibility_settings'
 
 export const AccessibilityModal: React.FC<{
   isOpen: boolean
   onClose: () => void
 }> = ({ isOpen, onClose }) => {
+  const { t } = useLanguage()
   const [settings, setSettings] = useState<AccessibilityState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -157,12 +159,12 @@ export const AccessibilityModal: React.FC<{
               <path d="M9 20l3-5 3 5" />
             </svg>
             <h3 id="a11y-modal-title" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#150202' }}>
-              Accessibility Controls
+              {t('Accessibility Controls', 'अभिगम्यता नियंत्रण')}
             </h3>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close Accessibility Controls"
+            aria-label={t('Close Accessibility Controls', 'अभिगम्यता नियंत्रण बंद करें')}
             style={{
               background: '#EBEAEA',
               border: 'none',
@@ -182,7 +184,7 @@ export const AccessibilityModal: React.FC<{
           </button>
         </div>
 
-        {/* 8 Accessibility Buttons Grid as per Figure 44 (Page 67, DBIM) */}
+        {/* Accessibility Buttons Grid */}
         <div
           style={{
             display: 'grid',
@@ -211,7 +213,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.3rem' }}>◉</span>
-            HIGH CONTRAST
+            {t('HIGH CONTRAST', 'उच्च कंट्रास्ट')}
           </button>
 
           {/* 2. Invert */}
@@ -234,7 +236,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.3rem' }}>◐</span>
-            INVERT COLORS
+            {t('INVERT COLORS', 'रंग उलटें')}
           </button>
 
           {/* 3. Saturation */}
@@ -257,7 +259,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.3rem' }}>◑</span>
-            SATURATION
+            {t('SATURATION', 'संतृप्ति')}
           </button>
 
           {/* 4. Text Size Increase (A+) */}
@@ -280,7 +282,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>A+</span>
-            TEXT SIZE INCREASE
+            {t('TEXT SIZE INCREASE', 'टेक्स्ट का आकार बढ़ाएं')}
           </button>
 
           {/* 5. Text Size Decrease (A-) */}
@@ -303,7 +305,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>A-</span>
-            TEXT SIZE DECREASE
+            {t('TEXT SIZE DECREASE', 'टेक्स्ट का आकार घटाएं')}
           </button>
 
           {/* 6. Highlight Links */}
@@ -326,7 +328,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.3rem' }}>🔗</span>
-            HIGHLIGHT LINKS
+            {t('HIGHLIGHT LINKS', 'लिंक हाइलाइट करें')}
           </button>
 
           {/* 7. Hide Images */}
@@ -349,7 +351,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.3rem' }}>⃠</span>
-            HIDE IMAGES
+            {t('HIDE IMAGES', 'चित्र छिपाएं')}
           </button>
 
           {/* 8. Default / High-Vis Cursor */}
@@ -372,7 +374,7 @@ export const AccessibilityModal: React.FC<{
             }}
           >
             <span style={{ fontSize: '1.3rem' }}>⤹</span>
-            LARGE CURSOR
+            {t('LARGE CURSOR', 'बड़ा कर्सर')}
           </button>
         </div>
 
@@ -392,7 +394,7 @@ export const AccessibilityModal: React.FC<{
               cursor: 'pointer',
             }}
           >
-            Reset Defaults
+            {t('Reset Defaults', 'डिफ़ॉल्ट रीसेट करें')}
           </button>
           <button
             type="button"
@@ -408,7 +410,7 @@ export const AccessibilityModal: React.FC<{
               cursor: 'pointer',
             }}
           >
-            Done
+            {t('Done', 'पूर्ण')}
           </button>
         </div>
       </div>

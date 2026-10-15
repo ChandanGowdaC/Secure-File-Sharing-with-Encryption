@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { useLanguage } from '../context/LanguageContext'
 
-const COOKIE_CONSENT_KEY = 'gov_dbim_cookie_consent'
+const COOKIE_CONSENT_KEY = 'sfs_cookie_consent'
 
 interface CookiePreferences {
   essential: boolean // strictly required
@@ -9,6 +10,7 @@ interface CookiePreferences {
 }
 
 export const CookieBanner: React.FC = () => {
+  const { t } = useLanguage()
   const [isVisible, setIsVisible] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [preferences, setPreferences] = useState<CookiePreferences>({
@@ -55,11 +57,11 @@ export const CookieBanner: React.FC = () => {
 
   return (
     <>
-      {/* Cookie Consent Banner - Bottom of Page (DBIM Section 7.6.1.ii, Figure 40, Page 61) */}
+      {/* Cookie Consent Banner - Bottom of Page */}
       {isVisible && (
         <div
           role="region"
-          aria-label="Cookie Consent Banner"
+          aria-label={t('Cookie Consent Banner', 'कुकी सहमति बैनर')}
           style={{
             position: 'fixed',
             bottom: 0,
@@ -80,7 +82,10 @@ export const CookieBanner: React.FC = () => {
         >
           <div style={{ flex: '1 1 500px' }}>
             <p style={{ margin: 0, fontSize: '0.9rem', color: '#150202', lineHeight: 1.5 }}>
-              This website uses cookies to provide a better user experience. By clicking accept, you agree to the policies outlined in the{' '}
+              {t(
+                'This website uses cookies to provide a better user experience. By clicking accept, you agree to the policies outlined in the ',
+                'यह वेबसाइट बेहतर उपयोगकर्ता अनुभव प्रदान करने के लिए कुकीज़ का उपयोग करती है। स्वीकार पर क्लिक करके, आप नीतियों से सहमत होते हैं '
+              )}
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
@@ -96,9 +101,12 @@ export const CookieBanner: React.FC = () => {
                   fontSize: 'inherit',
                 }}
               >
-                Cookie Settings
+                {t('Cookie Settings', 'कुकी सेटिंग्स')}
               </button>
-              {' '}in compliance with the Digital Personal Data Protection Act, 2023.
+              {t(
+                ' in compliance with data privacy standards.',
+                ' डेटा गोपनीयता मानकों के अनुपालन में।'
+              )}
             </p>
           </div>
 
@@ -120,7 +128,7 @@ export const CookieBanner: React.FC = () => {
                 transition: 'all 0.2s ease',
               }}
             >
-              CUSTOMIZE COOKIES
+              {t('CUSTOMIZE COOKIES', 'कुकीज़ अनुकूलित करें')}
             </button>
 
             {/* Accept Essential Cookies */}
@@ -140,7 +148,7 @@ export const CookieBanner: React.FC = () => {
                 transition: 'all 0.2s ease',
               }}
             >
-              ACCEPT ESSENTIAL COOKIES
+              {t('ACCEPT ESSENTIAL COOKIES', 'आवश्यक कुकीज़ स्वीकार करें')}
             </button>
 
             {/* Accept All Cookies */}
@@ -161,13 +169,13 @@ export const CookieBanner: React.FC = () => {
                 transition: 'all 0.2s ease',
               }}
             >
-              ACCEPT ALL COOKIES
+              {t('ACCEPT ALL COOKIES', 'सभी कुकीज़ स्वीकार करें')}
             </button>
           </div>
         </div>
       )}
 
-      {/* Cookie Settings Modal (DBIM Figure 41, Page 63) */}
+      {/* Cookie Settings Modal */}
       {isSettingsOpen && (
         <div
           role="dialog"
@@ -201,11 +209,11 @@ export const CookieBanner: React.FC = () => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h2 id="cookie-settings-title" style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, color: '#150202' }}>
-                Cookie Setting
+                {t('Cookie Settings', 'कुकी सेटिंग्स')}
               </h2>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                aria-label="Close Cookie Settings"
+                aria-label={t('Close Cookie Settings', 'कुकी सेटिंग्स बंद करें')}
                 style={{
                   background: '#EBEAEA',
                   border: 'none',
@@ -226,48 +234,60 @@ export const CookieBanner: React.FC = () => {
             </div>
 
             <p style={{ fontSize: '0.85rem', color: '#606060', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-              Welcome to the Cookie Settings page, where you have the power to tailor your browsing experience. Here you will find detailed information about the cookies we use, categorized as &apos;Essential&apos; and &apos;Optional&apos;. Make informed choices that align with your privacy preferences under the Digital Personal Data Protection (DPDP) Act, 2023.
+              {t(
+                "Welcome to the Cookie Settings page. Here you will find detailed information about the cookies we use, categorized as 'Essential' and 'Optional'. Make choices that align with your privacy preferences.",
+                'कुकी सेटिंग्स पृष्ठ पर आपका स्वागत है। यहाँ आपको हमारे द्वारा उपयोग की जाने वाली कुकीज़ के बारे में विस्तृत जानकारी मिलेगी, जिन्हें आवश्यक और वैकल्पिक के रूप में वर्गीकृत किया गया है।'
+              )}
             </p>
 
-            {/* Essential Cookies (Section 7.6.3.1, Page 61) */}
+            {/* Essential Cookies */}
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #EBEAEA' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#150202', marginBottom: '0.5rem' }}>
-                ESSENTIAL COOKIES
+                {t('ESSENTIAL COOKIES', 'आवश्यक कुकीज़')}
               </h3>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.75rem' }}>
                 <div>
-                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>Session Cookies</strong>
+                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>{t('Session Cookies', 'सत्र कुकीज़')}</strong>
                   <p style={{ fontSize: '0.8rem', color: '#606060', margin: '2px 0 0' }}>
-                    Enables user session persistence, allowing seamless navigation on the website. Automatically removed when logging out.
+                    {t(
+                      'Enables user session persistence, allowing seamless navigation on the website. Automatically removed when logging out.',
+                      'उपयोगकर्ता सत्र बनाए रखता है, जिससे वेबसाइट पर नेविगेशन सक्षम होता है। लॉग आउट करने पर स्वचालित रूप से हटा दिया जाता है।'
+                    )}
                   </p>
                 </div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#198754', padding: '2px 8px', background: '#E6F4EA', borderRadius: '4px' }}>
-                  ALWAYS ACTIVE
+                  {t('ALWAYS ACTIVE', 'सदैव सक्रिय')}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                 <div>
-                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>Persistent Preference Cookies</strong>
+                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>{t('Persistent Preference Cookies', 'प्राथमिकता कुकीज़')}</strong>
                   <p style={{ fontSize: '0.8rem', color: '#606060', margin: '2px 0 0' }}>
-                    Remembers user preferences like language, accessibility settings, and cryptographic identity keys in browser vault.
+                    {t(
+                      'Remembers user preferences like language, accessibility settings, and cryptographic identity keys in browser vault.',
+                      'ब्राउज़र वॉल्ट में भाषा, अभिगम्यता सेटिंग्स और क्रिप्टोग्राफ़िक पहचान कुंजियों जैसी उपयोगकर्ता प्राथमिकताओं को याद रखता है।'
+                    )}
                   </p>
                 </div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#198754', padding: '2px 8px', background: '#E6F4EA', borderRadius: '4px' }}>
-                  ALWAYS ACTIVE
+                  {t('ALWAYS ACTIVE', 'सदैव सक्रिय')}
                 </span>
               </div>
             </div>
 
-            {/* Optional Cookies (Section 7.6.3.2, Page 62) */}
+            {/* Optional Cookies */}
             <div style={{ marginBottom: '1.75rem', padding: '1rem', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #EBEAEA' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#150202', marginBottom: '0.5rem' }}>
-                OPTIONAL COOKIES
+                {t('OPTIONAL COOKIES', 'वैकल्पिक कुकीज़')}
               </h3>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
-                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>Preference / Functionality Cookies</strong>
+                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>{t('Preference / Functionality Cookies', 'प्राथमिकता / कार्यक्षमता कुकीज़')}</strong>
                   <p style={{ fontSize: '0.8rem', color: '#606060', margin: '2px 0 0' }}>
-                    Remembers search history, recent transfers, and recipient shortcuts.
+                    {t(
+                      'Remembers search history, recent transfers, and recipient shortcuts.',
+                      'खोज इतिहास, हालिया स्थानांतरण और प्राप्तकर्ता शॉर्टकट याद रखता है।'
+                    )}
                   </p>
                 </div>
                 <input
@@ -279,9 +299,12 @@ export const CookieBanner: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                 <div>
-                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>Analytics & Monitoring Cookies</strong>
+                  <strong style={{ fontSize: '0.85rem', color: '#150202' }}>{t('Analytics & Monitoring Cookies', 'एनालिटिक्स एवं मॉनिटरिंग कुकीज़')}</strong>
                   <p style={{ fontSize: '0.8rem', color: '#606060', margin: '2px 0 0' }}>
-                    Anonymous metrics to improve user interface responsiveness and page loading speeds.
+                    {t(
+                      'Anonymous metrics to improve user interface responsiveness and page loading speeds.',
+                      'यूज़र इंटरफ़ेस प्रतिक्रिया और पेज लोडिंग गति में सुधार के लिए अनाम मेट्रिक्स।'
+                    )}
                   </p>
                 </div>
                 <input
@@ -309,7 +332,7 @@ export const CookieBanner: React.FC = () => {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('Cancel', 'रद्द करें')}
               </button>
               <button
                 type="button"
@@ -325,7 +348,7 @@ export const CookieBanner: React.FC = () => {
                   cursor: 'pointer',
                 }}
               >
-                Save Preferences
+                {t('Save Preferences', 'प्राथमिकताएं सहेजें')}
               </button>
             </div>
           </div>

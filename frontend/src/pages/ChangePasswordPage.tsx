@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 
 export const ChangePasswordPage: React.FC = () => {
+  const { t } = useLanguage()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -47,22 +49,22 @@ export const ChangePasswordPage: React.FC = () => {
     setMessage('')
 
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match. Please verify both entries.')
+      setError(t('New passwords do not match. Please verify both entries.', 'नए पासवर्ड मेल नहीं खाते। कृपया दोनों प्रविष्टियाँ जांचें।'))
       return
     }
 
     if (strengthLabel === 'Weak') {
-      setError('Password is too weak. Please include at least 8 characters with a mix of uppercase, lowercase, numbers, or symbols.')
+      setError(t('Password is too weak. Please include at least 8 characters with a mix of uppercase, lowercase, numbers, or symbols.', 'पासवर्ड बहुत कमजोर है। कृपया कम से कम 8 वर्ण बड़े, छोटे अक्षरों, अंकों या प्रतीकों के मिश्रण के साथ शामिल करें।'))
       return
     }
 
     setLoading(true)
     try {
       await api.auth.changePassword({ current_password: currentPassword, new_password: newPassword })
-      setMessage('Password successfully changed! Redirecting...')
+      setMessage(t('Password successfully changed! Redirecting...', 'पासवर्ड सफलतापूर्वक बदल दिया गया! पुनः निर्देशित किया जा रहा है...'))
       setTimeout(() => navigate('/upload'), 1500)
     } catch (err: any) {
-      setError(err.message || 'Failed to change password.')
+      setError(err.message || t('Failed to change password.', 'पासवर्ड बदलने में विफल।'))
     } finally {
       setLoading(false)
     }
@@ -74,26 +76,32 @@ export const ChangePasswordPage: React.FC = () => {
     confirmPassword.length >= 8 &&
     newPassword === confirmPassword
 
+  const getTranslatedStrength = () => {
+    if (strengthLabel === 'Weak') return t('Weak', 'कमजोर')
+    if (strengthLabel === 'Medium') return t('Medium', 'मध्यम')
+    return t('Strong', 'मजबूत')
+  }
+
   return (
     <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
-      {/* Breadcrumb Trail (DBIM Section 4.5.ii) */}
+      {/* Breadcrumb Trail */}
       <nav aria-label="Breadcrumb" style={{ fontSize: '0.82rem', color: '#606060', marginBottom: '1rem' }}>
-        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>Home</Link>
+        <Link to="/" style={{ color: '#214AAB', textDecoration: 'none' }}>{t('Home', 'होम')}</Link>
         <span style={{ margin: '0 0.5rem' }}>/</span>
-        <span style={{ color: '#150202', fontWeight: 600 }}>Change Password</span>
+        <span style={{ color: '#150202', fontWeight: 600 }}>{t('Change Password', 'पासवर्ड बदलें')}</span>
       </nav>
 
       <div className="glass-card" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#162F6A', textAlign: 'center', margin: '0 0 0.5rem' }}>
-          Change Account Password
+          {t('Change Account Password', 'खाता पासवर्ड बदलें')}
         </h1>
         <p style={{ color: '#606060', fontSize: '0.88rem', textAlign: 'center', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-          Update your account master password securely.
+          {t('Update your account master password securely.', 'अपना खाता मुख्य पासवर्ड सुरक्षित रूप से अपडेट करें।')}
         </p>
 
-        {/* Instructions at starting of form (DBIM Annexure B.i) */}
+        {/* Instructions at starting of form */}
         <div style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#606060', lineHeight: 1.5 }}>
-          <strong>Instructions:</strong> Fields marked with an asterisk (*) are mandatory. The new password must contain at least 8 characters.
+          <strong>{t('Instructions:', 'निर्देश:')}</strong> {t('Fields marked with an asterisk (*) are mandatory. The new password must contain at least 8 characters.', 'तारांकन (*) से चिह्नित फ़ील्ड अनिवार्य हैं। नया पासवर्ड कम से कम 8 वर्ण लंबा होना चाहिए।')}
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -102,7 +110,7 @@ export const ChangePasswordPage: React.FC = () => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="currentPassword" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
-              Current Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+              {t('Current Password', 'वर्तमान पासवर्ड')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
             </label>
             <input
               type="password"
@@ -112,14 +120,14 @@ export const ChangePasswordPage: React.FC = () => {
               onChange={e => setCurrentPassword(e.target.value)}
               required
               disabled={loading}
-              placeholder="Enter current password"
+              placeholder={t('Enter current password', 'वर्तमान पासवर्ड दर्ज करें')}
               style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             />
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="newPassword" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
-              New Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+              {t('New Password', 'नया पासवर्ड')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
             </label>
             <input
               type="password"
@@ -129,7 +137,7 @@ export const ChangePasswordPage: React.FC = () => {
               onChange={e => setNewPassword(e.target.value)}
               required
               disabled={loading}
-              placeholder="Enter new password (min. 8 characters)"
+              placeholder={t('Enter new password (min. 8 characters)', 'नया पासवर्ड दर्ज करें (न्यूनतम 8 वर्ण)')}
               style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             />
             {newPassword && (
@@ -138,7 +146,7 @@ export const ChangePasswordPage: React.FC = () => {
                   <div className="password-strength-fill" />
                 </div>
                 <div className="password-strength-label" style={{ fontSize: '0.78rem' }}>
-                  Strength: <strong>{strengthLabel}</strong>
+                  {t('Strength:', 'सामर्थ्य:')} <strong>{getTranslatedStrength()}</strong>
                 </div>
               </div>
             )}
@@ -146,7 +154,7 @@ export const ChangePasswordPage: React.FC = () => {
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="confirmPassword" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
-              Confirm New Password <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>(Required)</span>
+              {t('Confirm New Password', 'नए पासवर्ड की पुष्टि करें')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
             </label>
             <input
               type="password"
@@ -156,7 +164,7 @@ export const ChangePasswordPage: React.FC = () => {
               onChange={e => setConfirmPassword(e.target.value)}
               required
               disabled={loading}
-              placeholder="Confirm new password"
+              placeholder={t('Confirm new password', 'नए पासवर्ड की पुष्टि करें')}
               style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
             />
           </div>
@@ -174,7 +182,7 @@ export const ChangePasswordPage: React.FC = () => {
               transition: 'all 0.2s ease',
             }}
           >
-            {loading ? 'Updating Password...' : 'Save Password'}
+            {loading ? t('Updating Password...', 'पासवर्ड अपडेट हो रहा है...') : t('Save Password', 'पासवर्ड सहेजें')}
           </button>
         </form>
       </div>

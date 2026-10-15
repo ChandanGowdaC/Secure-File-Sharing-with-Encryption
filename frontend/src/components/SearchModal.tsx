@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconSearch } from './LineIcons'
+import { useLanguage } from '../context/LanguageContext'
 
 interface SearchItem {
   id: string
-  title: string
-  category: 'Services' | 'Documentation' | 'Security' | 'Account'
-  description: string
+  titleEn: string
+  titleHi: string
+  categoryEn: 'Services' | 'Documentation' | 'Security' | 'Account'
+  categoryHi: string
+  descriptionEn: string
+  descriptionHi: string
   link: string
   tags: string[]
 }
@@ -14,83 +18,113 @@ interface SearchItem {
 const SEARCH_DATABASE: SearchItem[] = [
   {
     id: 's1',
-    title: 'Send File (Upload)',
-    category: 'Services',
-    description: 'Encrypt a file in your browser and securely send it to another registered user.',
+    titleEn: 'Send File (Upload)',
+    titleHi: 'फ़ाइल भेजें (अपलोड)',
+    categoryEn: 'Services',
+    categoryHi: 'सेवाएं',
+    descriptionEn: 'Encrypt a file in your browser and securely send it to another registered user.',
+    descriptionHi: 'अपने ब्राउज़र में फ़ाइल को एन्क्रिप्ट करें और पंजीकृत उपयोगकर्ता को सुरक्षित रूप से भेजें।',
     link: '/upload',
-    tags: ['upload', 'send', 'encrypt', 'files', 'transfer'],
+    tags: ['upload', 'send', 'encrypt', 'files', 'transfer', 'अपलोड', 'भेजें'],
   },
   {
     id: 's2',
-    title: 'Recipient Inbox',
-    category: 'Services',
-    description: 'View incoming transfers, decrypt files in the browser, or download raw ciphertext (.bin).',
+    titleEn: 'Recipient Inbox',
+    titleHi: 'प्राप्तकर्ता इनबॉक्स',
+    categoryEn: 'Services',
+    categoryHi: 'सेवाएं',
+    descriptionEn: 'View incoming transfers, decrypt files in the browser, or download raw ciphertext (.bin).',
+    descriptionHi: 'आवक स्थानांतरण देखें, ब्राउज़र में फ़ाइलों को डिक्रिप्ट करें, या सिफरटेक्स्ट डाउनलोड करें।',
     link: '/inbox',
-    tags: ['inbox', 'received', 'decrypt', 'download', 'files', 'bin'],
+    tags: ['inbox', 'received', 'decrypt', 'download', 'files', 'bin', 'इनबॉक्स', 'डिक्रिप्ट'],
   },
   {
     id: 's3',
-    title: 'Change Password',
-    category: 'Account',
-    description: 'Update your account password while keeping your encryption keys safe.',
+    titleEn: 'Change Password',
+    titleHi: 'पासवर्ड बदलें',
+    categoryEn: 'Account',
+    categoryHi: 'खाता',
+    descriptionEn: 'Update your account password while keeping your encryption keys safe.',
+    descriptionHi: 'अपनी एन्क्रिप्शन कुंजियों को सुरक्षित रखते हुए खाता पासवर्ड अपडेट करें।',
     link: '/change-password',
-    tags: ['password', 'change password', 'account', 'security', 'update'],
+    tags: ['password', 'change password', 'account', 'security', 'update', 'पासवर्ड'],
   },
   {
     id: 'd1',
-    title: 'User Manual (PDF)',
-    category: 'Documentation',
-    description: 'Comprehensive user guide with step-by-step instructions and screenshots.',
+    titleEn: 'User Manual (PDF)',
+    titleHi: 'उपयोगकर्ता नियमावली (PDF)',
+    categoryEn: 'Documentation',
+    categoryHi: 'दस्तावेज़ीकरण',
+    descriptionEn: 'Comprehensive user guide with step-by-step instructions and screenshots.',
+    descriptionHi: 'चरण-दर-चरण निर्देशों और स्क्रीनशॉट के साथ व्यापक मार्गदर्शिका।',
     link: '/Secure_File_Sharing_User_Manual.pdf',
-    tags: ['manual', 'pdf', 'guide', 'documentation', 'help', 'instructions'],
+    tags: ['manual', 'pdf', 'guide', 'documentation', 'help', 'instructions', 'नियमावली'],
   },
   {
     id: 's4',
-    title: 'Sign In',
-    category: 'Account',
-    description: 'Log in to your account with password and two-factor authentication (2FA).',
+    titleEn: 'Sign In',
+    titleHi: 'साइन इन करें',
+    categoryEn: 'Account',
+    categoryHi: 'खाता',
+    descriptionEn: 'Log in to your account with password and two-factor authentication (2FA).',
+    descriptionHi: 'पासवर्ड और दो-चरणीय प्रमाणीकरण (2FA) के साथ अपने खाते में लॉगिन करें।',
     link: '/login',
-    tags: ['login', 'signin', '2fa', 'totp', 'auth'],
+    tags: ['login', 'signin', '2fa', 'totp', 'auth', 'लॉगिन', 'साइन इन'],
   },
   {
     id: 's5',
-    title: 'Register Account',
-    category: 'Account',
-    description: 'Create a new account and generate your encryption keys in the browser.',
+    titleEn: 'Register Account',
+    titleHi: 'खाता पंजीकृत करें',
+    categoryEn: 'Account',
+    categoryHi: 'खाता',
+    descriptionEn: 'Create a new account and generate your encryption keys in the browser.',
+    descriptionHi: 'नया खाता बनाएं और ब्राउज़र में अपनी एन्क्रिप्शन कुंजियाँ उत्पन्न करें।',
     link: '/register',
-    tags: ['register', 'signup', 'keys', 'keypair', 'indexeddb'],
+    tags: ['register', 'signup', 'keys', 'keypair', 'indexeddb', 'पंजीकरण'],
   },
   {
     id: 's6',
-    title: 'Forgot Password',
-    category: 'Account',
-    description: 'Reset your password using an email verification code (OTP).',
+    titleEn: 'Forgot Password',
+    titleHi: 'पासवर्ड भूल गए',
+    categoryEn: 'Account',
+    categoryHi: 'खाता',
+    descriptionEn: 'Reset your password using an email verification code (OTP).',
+    descriptionHi: 'ईमेल सत्यापन कोड (ओटीपी) का उपयोग करके अपना पासवर्ड रीसेट करें।',
     link: '/forgot-password',
-    tags: ['password', 'reset', 'forgot', 'otp', 'recovery'],
+    tags: ['password', 'reset', 'forgot', 'otp', 'recovery', 'पासवर्ड'],
   },
   {
     id: 's7',
-    title: 'Admin Console',
-    category: 'Security',
-    description: 'View system audit logs, registered users, and active transfers (admin only).',
+    titleEn: 'Admin Console',
+    titleHi: 'व्यवस्थापक कंसोल',
+    categoryEn: 'Security',
+    categoryHi: 'सुरक्षा',
+    descriptionEn: 'View system audit logs, registered users, and active transfers (admin only).',
+    descriptionHi: 'सिस्टम ऑडिट लॉग, पंजीकृत उपयोगकर्ता और सक्रिय स्थानांतरण देखें।',
     link: '/admin',
-    tags: ['audit', 'logs', 'admin', 'users', 'transfers', 'security'],
+    tags: ['audit', 'logs', 'admin', 'users', 'transfers', 'security', 'ऑडिट', 'प्रशासन'],
   },
   {
     id: 'sec1',
-    title: 'Security & Architecture',
-    category: 'Documentation',
-    description: 'Overview of AES-256-GCM authenticated encryption and ECDH key agreement.',
+    titleEn: 'Security & Architecture',
+    titleHi: 'सुरक्षा एवं वास्तुकला',
+    categoryEn: 'Documentation',
+    categoryHi: 'दस्तावेज़ीकरण',
+    descriptionEn: 'Overview of AES-256-GCM authenticated encryption and DH key agreement.',
+    descriptionHi: 'AES-256-GCM प्रमाणीकृत एन्क्रिप्शन और DH कुंजी समझौते का अवलोकन।',
     link: '/',
-    tags: ['crypto', 'algorithm', 'security', 'aes', 'gcm', 'ecdh'],
+    tags: ['crypto', 'algorithm', 'security', 'aes', 'gcm', 'dh', 'diffie-hellman', 'सुरक्षा'],
   },
   {
     id: 'info1',
-    title: 'Project Creators & Guidance (IT303)',
-    category: 'Documentation',
-    description: 'Developed by Prabhav P (241IT053), Sucheth K Katte (241IT078), and Chandan Gowda C (241IT016) under Dr. Jaidhar C D at NITK Surathkal.',
+    titleEn: 'Project Creators & Guidance (IT303)',
+    titleHi: 'परियोजना निर्माता एवं मार्गदर्शन (IT303)',
+    categoryEn: 'Documentation',
+    categoryHi: 'दस्तावेज़ीकरण',
+    descriptionEn: 'Developed by Prabhav P (241IT053), Sucheth K Katte (241IT078), and Chandan Gowda C (241IT016) under Dr. Jaidhar C D at NITK Surathkal.',
+    descriptionHi: 'एनआईटीके सुरथकल में डॉ. जयधर सी डी के मार्गदर्शन में प्रभाव पी (241IT053), सुचेत के कट्टे (241IT078) और चंदन गौड़ा सी (241IT016) द्वारा विकसित।',
     link: '/',
-    tags: ['creators', 'contact', 'email', 'nitk', 'jaidhar', 'it303', 'authors', 'roll number', 'prabhav', 'sucheth', 'chandan'],
+    tags: ['creators', 'contact', 'email', 'nitk', 'jaidhar', 'it303', 'authors', 'roll number', 'prabhav', 'sucheth', 'chandan', 'निर्माता'],
   },
 ]
 
@@ -98,25 +132,36 @@ export const SearchModal: React.FC<{
   isOpen: boolean
   onClose: () => void
 }> = ({ isOpen, onClose }) => {
+  const { t, isHindi } = useLanguage()
   const [query, setQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const navigate = useNavigate()
 
-  const categories = ['All', 'Services', 'Documentation', 'Security', 'Account']
+  const categories = [
+    { key: 'All', labelEn: 'All', labelHi: 'सभी' },
+    { key: 'Services', labelEn: 'Services', labelHi: 'सेवाएं' },
+    { key: 'Documentation', labelEn: 'Documentation', labelHi: 'दस्तावेज़ीकरण' },
+    { key: 'Security', labelEn: 'Security', labelHi: 'सुरक्षा' },
+    { key: 'Account', labelEn: 'Account', labelHi: 'खाता' },
+  ]
 
   const filteredResults = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SEARCH_DATABASE.filter((item) => {
-      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory
+      const matchesCategory = selectedCategory === 'All' || item.categoryEn === selectedCategory
       if (!matchesCategory) return false
       if (!q) return true
+      const title = isHindi ? item.titleHi : item.titleEn
+      const desc = isHindi ? item.descriptionHi : item.descriptionEn
       return (
-        item.title.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q) ||
+        item.titleEn.toLowerCase().includes(q) ||
+        item.titleHi.toLowerCase().includes(q) ||
+        title.toLowerCase().includes(q) ||
+        desc.toLowerCase().includes(q) ||
         item.tags.some((tag) => tag.toLowerCase().includes(q))
       )
     })
-  }, [query, selectedCategory])
+  }, [query, selectedCategory, isHindi])
 
   if (!isOpen) return null
 
@@ -178,7 +223,7 @@ export const SearchModal: React.FC<{
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search pages, transfers, user manual..."
+            placeholder={t('Search pages, transfers, user manual...', 'पृष्ठ, स्थानांतरण, उपयोगकर्ता नियमावली खोजें...')}
             style={{
               flex: 1,
               border: 'none',
@@ -192,7 +237,7 @@ export const SearchModal: React.FC<{
           {query && (
             <button
               onClick={() => setQuery('')}
-              aria-label="Clear search"
+              aria-label={t('Clear search', 'खोज साफ़ करें')}
               style={{
                 background: 'none',
                 border: 'none',
@@ -207,7 +252,7 @@ export const SearchModal: React.FC<{
           )}
           <button
             onClick={onClose}
-            aria-label="Close search"
+            aria-label={t('Close search', 'खोज बंद करें')}
             style={{
               background: '#FFFFFF',
               border: '1px solid #C6C6C6',
@@ -236,22 +281,22 @@ export const SearchModal: React.FC<{
         >
           {categories.map((cat) => (
             <button
-              key={cat}
+              key={cat.key}
               type="button"
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => setSelectedCategory(cat.key)}
               style={{
                 padding: '0.3rem 0.8rem',
                 borderRadius: '16px',
-                border: selectedCategory === cat ? '1px solid #214AAB' : '1px solid #EBEAEA',
-                backgroundColor: selectedCategory === cat ? '#EEF2FF' : '#F8FAFC',
-                color: selectedCategory === cat ? '#214AAB' : '#606060',
+                border: selectedCategory === cat.key ? '1px solid #214AAB' : '1px solid #EBEAEA',
+                backgroundColor: selectedCategory === cat.key ? '#EEF2FF' : '#F8FAFC',
+                color: selectedCategory === cat.key ? '#214AAB' : '#606060',
                 fontSize: '0.8rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
               }}
             >
-              {cat}
+              {isHindi ? cat.labelHi : cat.labelEn}
             </button>
           ))}
         </div>
@@ -261,9 +306,11 @@ export const SearchModal: React.FC<{
           {filteredResults.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#606060' }}>
               <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
-              <p style={{ margin: 0, fontWeight: 600 }}>No results found for &quot;{query}&quot;</p>
+              <p style={{ margin: 0, fontWeight: 600 }}>
+                {t(`No results found for "${query}"`, `"${query}" के लिए कोई परिणाम नहीं मिला`)}
+              </p>
               <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
-                Try searching for &quot;upload&quot;, &quot;inbox&quot;, &quot;manual&quot;, &quot;aes&quot;, or &quot;key&quot;.
+                {t('Try searching for "upload", "inbox", "manual", "aes", or "dh".', '“अपलोड”, “इनबॉक्स”, “नियमावली”, “aes”, या “dh” खोज कर देखें।')}
               </p>
             </div>
           ) : (
@@ -291,7 +338,7 @@ export const SearchModal: React.FC<{
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#162F6A', margin: 0 }}>
-                      {item.title}
+                      {isHindi ? item.titleHi : item.titleEn}
                     </h4>
                     <span
                       style={{
@@ -303,16 +350,16 @@ export const SearchModal: React.FC<{
                         fontWeight: 600,
                       }}
                     >
-                      {item.category}
+                      {isHindi ? item.categoryHi : item.categoryEn}
                     </span>
                   </div>
                   <p style={{ margin: '0 0 6px', fontSize: '0.83rem', color: '#606060', lineHeight: 1.4 }}>
-                    {item.description}
+                    {isHindi ? item.descriptionHi : item.descriptionEn}
                   </p>
                   <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                    {item.tags.map((t) => (
+                    {item.tags.map((tg) => (
                       <span
-                        key={t}
+                        key={tg}
                         style={{
                           fontSize: '0.7rem',
                           background: '#F1F5F9',
@@ -321,7 +368,7 @@ export const SearchModal: React.FC<{
                           borderRadius: '3px',
                         }}
                       >
-                        #{t}
+                        #{tg}
                       </span>
                     ))}
                   </div>
@@ -344,8 +391,8 @@ export const SearchModal: React.FC<{
             alignItems: 'center',
           }}
         >
-          <span>Navigate with mouse or keyboard &bull; Press <kbd>ESC</kbd> to exit</span>
-          <span>{filteredResults.length} matching items</span>
+          <span>{t('Navigate with mouse or keyboard • Press ESC to exit', 'माउस या कीबोर्ड से नेविगेट करें • बाहर निकलने के लिए ESC दबाएं')}</span>
+          <span>{filteredResults.length} {t('matching items', 'मेल खाते परिणाम')}</span>
         </div>
       </div>
     </div>

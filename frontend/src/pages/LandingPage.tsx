@@ -2,52 +2,81 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ProjectEmblem } from '../components/BrandLogos'
 import { IconUpload, IconLock, IconDownload, IconView, IconShield } from '../components/LineIcons'
+import { useLanguage } from '../context/LanguageContext'
 
 export const LandingPage: React.FC = () => {
+  const { isHindi, t } = useLanguage()
   const [selectedPersona, setSelectedPersona] = useState<'sender' | 'recipient' | 'auditor'>('sender')
 
   const personas = {
     sender: {
-      type: 'Sender',
-      intent: 'Encrypt files directly in your browser before sending them to any registered user.',
-      actionTitle: 'Send File',
+      type: t('Sender', 'प्रेषक'),
+      intent: t(
+        'Encrypt files directly in your browser before sending them to any registered user.',
+        'किसी भी पंजीकृत उपयोगकर्ता को भेजने से पहले सीधे अपने ब्राउज़र में फ़ाइलों को एन्क्रिप्ट करें।'
+      ),
+      actionTitle: t('Send File', 'फ़ाइल भेजें'),
       actionLink: '/upload',
-      highlights: [
-        'Client-side AES-256-GCM encryption ensures plaintext never leaves your device',
-        'Automatic recipient public key lookup by username or email',
-        'Ephemeral ECDH P-256 keypair generated per transfer',
-      ],
+      highlights: isHindi
+        ? [
+            'क्लाइंट-साइड AES-256-GCM एन्क्रिप्शन सुनिश्चित करता है कि प्लेनटेक्स्ट कभी आपके डिवाइस से बाहर न जाए',
+            'उपयोगकर्ता नाम या ईमेल द्वारा स्वचालित प्राप्तकर्ता सार्वजनिक कुंजी खोज',
+            'प्रति स्थानांतरण क्षणिक DH कुंजी युग्म उत्पन्न होता है',
+          ]
+        : [
+            'Client-side AES-256-GCM encryption ensures plaintext never leaves your device',
+            'Automatic recipient public key lookup by username or email',
+            'Ephemeral DH keypair generated per transfer',
+          ],
       avatar: '📤',
     },
     recipient: {
-      type: 'Recipient',
-      intent: 'Receive and decrypt incoming files in your browser using your stored private key.',
-      actionTitle: 'Inbox',
+      type: t('Recipient', 'प्राप्तकर्ता'),
+      intent: t(
+        'Receive and decrypt incoming files in your browser using your stored private key.',
+        'अपनी संग्रहीत निजी कुंजी का उपयोग करके अपने ब्राउज़र में आने वाली फ़ाइलों को प्राप्त और डिक्रिप्ट करें।'
+      ),
+      actionTitle: t('Inbox', 'इनबॉक्स'),
       actionLink: '/inbox',
-      highlights: [
-        'Private key stored safely in your browser IndexedDB',
-        'Download either the decrypted file or the raw ciphertext (.bin)',
-        'Integrity verification with 128-bit authentication tag',
-      ],
+      highlights: isHindi
+        ? [
+            'निजी कुंजी आपके ब्राउज़र IndexedDB में सुरक्षित रूप से संग्रहीत है',
+            'डिक्रिप्ट की गई फ़ाइल या रॉ सिफ़रटेक्स्ट (.bin) डाउनलोड करें',
+            '128-बिट प्रमाणीकरण टैग के साथ अखंडता सत्यापन',
+          ]
+        : [
+            'Private key stored safely in your browser IndexedDB',
+            'Download either the decrypted file or the raw ciphertext (.bin)',
+            'Integrity verification with 128-bit authentication tag',
+          ],
       avatar: '📥',
     },
     auditor: {
-      type: 'Administrator',
-      intent: 'View audit logs, system status, and user management.',
-      actionTitle: 'Admin Console',
+      type: t('Administrator', 'प्रशासक'),
+      intent: t(
+        'View audit logs, system status, and user management.',
+        'ऑडिट लॉग, सिस्टम स्थिति और उपयोगकर्ता प्रबंधन देखें।'
+      ),
+      actionTitle: t('Admin Console', 'एडमिन कंसोल'),
       actionLink: '/admin',
-      highlights: [
-        'Audit trail tracking logins, transfers, and account events',
-        'Zero plaintext is ever stored or logged on the server',
-        'User account and transfer management',
-      ],
+      highlights: isHindi
+        ? [
+            'लॉगिन, स्थानांतरण और खाता घटनाओं को ट्रैक करने वाला ऑडिट ट्रेल',
+            'सर्वर पर कभी भी कोई प्लेनटेक्स्ट संग्रहीत या लॉग नहीं किया जाता',
+            'उपयोगकर्ता खाता और स्थानांतरण प्रबंधन',
+          ]
+        : [
+            'Audit trail tracking logins, transfers, and account events',
+            'Zero plaintext is ever stored or logged on the server',
+            'User account and transfer management',
+          ],
       avatar: '🛡️',
     },
   }
 
   return (
     <div style={{ width: '100%', fontFamily: "'Noto Sans', sans-serif", color: '#150202', backgroundColor: '#FFFFFF' }}>
-      {/* 1. Hero Section (Government Portal Light Style) */}
+      {/* 1. Hero Section */}
       <section
         style={{
           background: 'linear-gradient(180deg, #F0F4FF 0%, #FFFFFF 100%)',
@@ -71,11 +100,14 @@ export const LandingPage: React.FC = () => {
               }}
             >
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#162F6A', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                IT303 Software Engineering Course Project &bull; NITK Surathkal
+                {t(
+                  'IT303 Software Engineering Course Project • NITK Surathkal',
+                  'आईटी303 सॉफ्टवेयर इंजीनियरिंग कोर्स प्रोजेक्ट • एनआईटीके सुरथकल'
+                )}
               </span>
             </div>
 
-            {/* Main Title 1 (DBIM 32px / 2rem, bold) */}
+            {/* Main Title */}
             <h1
               style={{
                 fontSize: 'clamp(1.9rem, 4vw, 2.75rem)',
@@ -86,7 +118,10 @@ export const LandingPage: React.FC = () => {
                 maxWidth: '900px',
               }}
             >
-              Secure File Sharing with Client-Side Encryption
+              {t(
+                'Secure File Sharing with Client-Side Encryption',
+                'सुरक्षित फ़ाइल साझाकरण (क्लाइंट-साइड एन्क्रिप्शन)'
+              )}
             </h1>
 
             {/* Subtitle */}
@@ -99,7 +134,15 @@ export const LandingPage: React.FC = () => {
                 margin: 0,
               }}
             >
-              A Zero-Knowledge Cryptographic File Transfer System engineered with browser-native <strong>AES-256-GCM</strong> and <strong>ECDH Curve P-256</strong> key agreement. Files are encrypted on your local device before transmission — server storage only ever handles ciphertext blobs.
+              {isHindi ? (
+                <>
+                  ब्राउज़र-नेटिव <strong>AES-256-GCM</strong> और <strong>डिफ़ी-हेलमैन (DH)</strong> कुंजी समझौते के साथ निर्मित ज़ीरो-नॉलेज क्रिप्टोग्राफ़िक फ़ाइल स्थानांतरण प्रणाली। ट्रांसमिशन से पहले फ़ाइलें आपके स्थानीय डिवाइस पर एन्क्रिप्ट की जाती हैं — सर्वर स्टोरेज केवल सिफ़रटेक्स्ट ब्लॉब्स को संभालता है।
+                </>
+              ) : (
+                <>
+                  A Zero-Knowledge Cryptographic File Transfer System engineered with browser-native <strong>AES-256-GCM</strong> and <strong>Diffie-Hellman (DH)</strong> key agreement. Files are encrypted on your local device before transmission — server storage only ever handles ciphertext blobs.
+                </>
+              )}
             </p>
 
             {/* Authorship & Academic Guidance */}
@@ -119,17 +162,21 @@ export const LandingPage: React.FC = () => {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <span style={{ color: '#606060' }}>Developed by:</span>
-                <strong style={{ color: '#162F6A' }}>Prabhav P</strong> <span style={{ color: '#606060' }}>(241IT053)</span>,
-                <strong style={{ color: '#162F6A' }}>Sucheth K Katte</strong> <span style={{ color: '#606060' }}>(241IT078)</span>, and
-                <strong style={{ color: '#162F6A' }}>Chandan Gowda C</strong> <span style={{ color: '#606060' }}>(241IT016)</span>
+                <span style={{ color: '#606060' }}>{t('Developed by:', 'विकासकर्ता:')}</span>
+                <strong style={{ color: '#162F6A' }}>{t('Prabhav P', 'प्रभाव पी')}</strong> <span style={{ color: '#606060' }}>(241IT053)</span>,
+                <strong style={{ color: '#162F6A' }}>{t('Sucheth K Katte', 'सुचेत के कट्टे')}</strong> <span style={{ color: '#606060' }}>(241IT078)</span>,{' '}
+                {t('and', 'और')}{' '}
+                <strong style={{ color: '#162F6A' }}>{t('Chandan Gowda C', 'चंदन गौड़ा सी')}</strong> <span style={{ color: '#606060' }}>(241IT016)</span>
               </div>
               <div style={{ fontSize: '0.84rem', color: '#606060' }}>
-                Under the Guidance of <strong style={{ color: '#162F6A' }}>Dr. Jaidhar C D</strong> &bull; Department of Information Technology, NITK Surathkal
+                {t(
+                  'Under the Guidance of Dr. Jaidhar C D • Department of Information Technology, NITK Surathkal',
+                  'डॉ. जैधर सी डी के मार्गदर्शन में • सूचना प्रौद्योगिकी विभाग, एनआईटीके सुरथकल'
+                )}
               </div>
             </div>
 
-            {/* Primary Action Buttons (Max 3 words, Figure 19) */}
+            {/* Primary Action Buttons */}
             <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
               <Link
                 to="/upload"
@@ -148,7 +195,7 @@ export const LandingPage: React.FC = () => {
                 }}
               >
                 <IconUpload size={20} color="#FFFFFF" />
-                <span>Send Encrypted File</span>
+                <span>{t('Send Encrypted File', 'एन्क्रिप्टेड फ़ाइल भेजें')}</span>
               </Link>
 
               <Link
@@ -169,7 +216,7 @@ export const LandingPage: React.FC = () => {
                 }}
               >
                 <IconDownload size={20} color="#162F6A" />
-                <span>Access Inbox</span>
+                <span>{t('Access Inbox', 'इनबॉक्स देखें')}</span>
               </Link>
 
               <a
@@ -191,11 +238,9 @@ export const LandingPage: React.FC = () => {
                 }}
               >
                 <IconView size={20} color="#606060" />
-                <span>View User Manual (PDF)</span>
+                <span>{t('View User Manual (PDF)', 'उपयोगकर्ता मैनुअल (PDF)')}</span>
               </a>
             </div>
-
-
           </div>
         </div>
       </section>
@@ -205,13 +250,16 @@ export const LandingPage: React.FC = () => {
         <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#214AAB', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Security Architecture
+              {t('Security Architecture', 'सुरक्षा वास्तुकला')}
             </span>
             <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#162F6A', margin: '0.35rem 0 0' }}>
-              Core Cryptographic Capabilities
+              {t('Core Cryptographic Capabilities', 'मुख्य क्रिप्टोग्राफ़िक क्षमताएं')}
             </h2>
             <p style={{ color: '#606060', fontSize: '0.95rem', margin: '0.5rem 0 0' }}>
-              Built according to NIST cryptographic guidelines with client-side isolation
+              {t(
+                'Built according to NIST cryptographic guidelines with client-side isolation',
+                'क्लाइंट-साइड अलगाव के साथ NIST क्रिप्टोग्राफ़िक दिशानिर्देशों के अनुसार निर्मित'
+              )}
             </p>
           </div>
 
@@ -236,10 +284,13 @@ export const LandingPage: React.FC = () => {
                 <IconLock size={24} color="#214AAB" />
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.5rem' }}>
-                Zero Server Trust
+                {t('Zero Server Trust', 'शून्य सर्वर विश्वास (Zero Trust)')}
               </h3>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
-                Private keys are created in the browser and stored exclusively in IndexedDB. Plaintext files never cross network boundaries.
+                {t(
+                  'Private keys are created in the browser and stored exclusively in IndexedDB. Plaintext files never cross network boundaries.',
+                  'निजी कुंजियां ब्राउज़र में बनाई जाती हैं और विशेष रूप से IndexedDB में संग्रहीत की जाती हैं। प्लेनटेक्स्ट फ़ाइलें कभी भी नेटवर्क सीमाओं को पार नहीं करती हैं।'
+                )}
               </p>
             </div>
 
@@ -257,10 +308,13 @@ export const LandingPage: React.FC = () => {
                 <IconShield size={24} color="#166534" />
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.5rem' }}>
-                AES-256-GCM + ECDH
+                AES-256-GCM + DH
               </h3>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
-                Authenticated encryption with a 128-bit integrity tag and forward-secret ephemeral HKDF-SHA256 key agreement.
+                {t(
+                  'Authenticated encryption with a 128-bit integrity tag and forward-secret ephemeral HKDF-SHA256 key agreement.',
+                  '128-बिट अखंडता टैग और फॉरवर्ड-सीक्रेट क्षणिक HKDF-SHA256 कुंजी समझौते के साथ प्रमाणित एन्क्रिप्शन।'
+                )}
               </p>
             </div>
 
@@ -278,10 +332,13 @@ export const LandingPage: React.FC = () => {
                 <IconDownload size={24} color="#916100" />
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.5rem' }}>
-                Dual Download Retention
+                {t('Dual Download Retention', 'दोहरी डाउनलोड प्रतिधारण')}
               </h3>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
-                Transfers remain available in the inbox after delivery so users can download either decrypted plaintext or raw ciphertext (.bin).
+                {t(
+                  'Transfers remain available in the inbox after delivery so users can download either decrypted plaintext or raw ciphertext (.bin).',
+                  'डिलिवरी के बाद स्थानांतरण इनबॉक्स में उपलब्ध रहता है ताकि उपयोगकर्ता डिक्रिप्टेड प्लेनटेक्स्ट या रॉ सिफ़रटेक्स्ट (.bin) डाउनलोड कर सकें।'
+                )}
               </p>
             </div>
 
@@ -299,10 +356,13 @@ export const LandingPage: React.FC = () => {
                 <ProjectEmblem size={32} color="#162F6A" />
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#162F6A', margin: '0 0 0.5rem' }}>
-                Immutable Audit Trail
+                {t('Immutable Audit Trail', 'अपरिवर्तनीय ऑडिट ट्रेल')}
               </h3>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.55, margin: 0 }}>
-                Tamper-resistant audit logs track system authentication, transfer dispatch, and deletion operations with zero plaintext leakage.
+                {t(
+                  'Tamper-resistant audit logs track system authentication, transfer dispatch, and deletion operations with zero plaintext leakage.',
+                  'छेड़छाड़-प्रतिरोधी ऑडिट लॉग शून्य प्लेनटेक्स्ट रिसाव के साथ सिस्टम प्रमाणीकरण, स्थानांतरण प्रेषण और विलोपन कार्यों को ट्रैक करते हैं।'
+                )}
               </p>
             </div>
           </div>
@@ -314,13 +374,16 @@ export const LandingPage: React.FC = () => {
         <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#214AAB', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Operational Workflow
+              {t('Operational Workflow', 'परिचालन कार्यप्रवाह')}
             </span>
             <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#162F6A', margin: '0.35rem 0 0' }}>
-              How End-to-End Encryption Works
+              {t('How End-to-End Encryption Works', 'एंड-टू-एंड एन्क्रिप्शन कैसे काम करता है')}
             </h2>
             <p style={{ color: '#606060', fontSize: '0.95rem', margin: '0.5rem 0 0' }}>
-              A 3-step zero-knowledge lifecycle from client dispatch to recipient decryption
+              {t(
+                'A 3-step zero-knowledge lifecycle from client dispatch to recipient decryption',
+                'क्लाइंट प्रेषण से लेकर प्राप्तकर्ता डिक्रिप्शन तक 3-चरणीय ज़ीरो-नॉलेज जीवनचक्र'
+              )}
             </p>
           </div>
 
@@ -338,11 +401,14 @@ export const LandingPage: React.FC = () => {
                   1
                 </span>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#162F6A', margin: 0 }}>
-                  Client-Side Encryption
+                  {t('Client-Side Encryption', 'क्लाइंट-साइड एन्क्रिप्शन')}
                 </h3>
               </div>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.6, margin: 0 }}>
-                Sender selects a file and specifies the recipient. The browser queries the recipient&apos;s public key, generates an ephemeral ECDH keypair, derives a 256-bit key via HKDF-SHA256, and encrypts the file locally using AES-256-GCM.
+                {t(
+                  "Sender selects a file and specifies the recipient. The browser queries the recipient's public key, generates an ephemeral DH keypair, derives a 256-bit key via HKDF-SHA256, and encrypts the file locally using AES-256-GCM.",
+                  'प्रेषक एक फ़ाइल चुनता है और प्राप्तकर्ता निर्दिष्ट करता है। ब्राउज़र प्राप्तकर्ता की सार्वजनिक कुंजी देखता है, एक क्षणिक DH कुंजी युग्म उत्पन्न करता है, HKDF-SHA256 के माध्यम से 256-बिट कुंजी व्युत्पन्न करता है, और AES-256-GCM का उपयोग करके फ़ाइल को स्थानीय रूप से एन्क्रिप्ट करता है।'
+                )}
               </p>
             </div>
 
@@ -353,11 +419,14 @@ export const LandingPage: React.FC = () => {
                   2
                 </span>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#162F6A', margin: 0 }}>
-                  Zero-Knowledge Dispatch
+                  {t('Zero-Knowledge Dispatch', 'ज़ीरो-नॉलेज प्रेषण')}
                 </h3>
               </div>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.6, margin: 0 }}>
-                Only the ciphertext blob, IV nonce, ephemeral public key, and authentication tag are uploaded to the server over TLS. The server storage cannot inspect, decrypt, or tamper with the payload.
+                {t(
+                  'Only the ciphertext blob, IV nonce, ephemeral public key, and authentication tag are uploaded to the server over TLS. The server storage cannot inspect, decrypt, or tamper with the payload.',
+                  'केवल सिफ़रटेक्स्ट ब्लॉब, IV नॉन्स, क्षणिक सार्वजनिक कुंजी और प्रमाणीकरण टैग को TLS पर सर्वर पर अपलोड किया जाता है। सर्वर स्टोरेज पेलोड का निरीक्षण, डिक्रिप्ट या छेड़छाड़ नहीं कर सकता।'
+                )}
               </p>
             </div>
 
@@ -368,26 +437,29 @@ export const LandingPage: React.FC = () => {
                   3
                 </span>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#162F6A', margin: 0 }}>
-                  In-Browser Decryption
+                  {t('In-Browser Decryption', 'ब्राउज़र में डिक्रिप्शन')}
                 </h3>
               </div>
               <p style={{ color: '#606060', fontSize: '0.88rem', lineHeight: 1.6, margin: 0 }}>
-                The recipient accesses their inbox, fetches the ciphertext payload, retrieves their long-term private key from IndexedDB, derives the transfer key, and decrypts the file locally in the browser.
+                {t(
+                  'The recipient accesses their inbox, fetches the ciphertext payload, retrieves their long-term private key from IndexedDB, derives the transfer key, and decrypts the file locally in the browser.',
+                  'प्राप्तकर्ता अपने इनबॉक्स तक पहुंचता है, सिफ़रटेक्स्ट पेलोड प्राप्त करता है, IndexedDB से अपनी दीर्घकालिक निजी कुंजी प्राप्त करता है, स्थानांतरण कुंजी प्राप्त करता है, और ब्राउज़र में स्थानीय रूप से फ़ाइल को डिक्रिप्ट करता है।'
+                )}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4. Interactive User Personas (DBIM Section A.2) */}
+      {/* 4. Interactive User Personas */}
       <section style={{ padding: '3.5rem 1.5rem', backgroundColor: '#FFFFFF' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#214AAB', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              User Journeys
+              {t('User Journeys', 'उपयोगकर्ता यात्राएं')}
             </span>
             <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#162F6A', margin: '0.35rem 0 0' }}>
-              Tailored Portals for Every Role
+              {t('Tailored Portals for Every Role', 'प्रत्येक भूमिका के लिए विशेष पोर्टल')}
             </h2>
           </div>
 
@@ -481,13 +553,16 @@ export const LandingPage: React.FC = () => {
           >
             <div style={{ flex: '1 1 400px' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#214AAB', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
-                Complete Project Documentation
+                {t('Complete Project Documentation', 'संपूर्ण परियोजना दस्तावेज़ीकरण')}
               </div>
               <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#162F6A', margin: '0 0 0.5rem' }}>
-                Secure File Sharing User Manual (PDF)
+                {t('Secure File Sharing User Manual (PDF)', 'सुरक्षित फ़ाइल साझाकरण उपयोगकर्ता मैनुअल (PDF)')}
               </h3>
               <p style={{ color: '#606060', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
-                Includes comprehensive end-to-end user manuals, annotated application screenshots, cryptographic flowcharts, 2FA setup guides, and administrative audit inspection procedures.
+                {t(
+                  'Includes comprehensive end-to-end user manuals, annotated application screenshots, cryptographic flowcharts, 2FA setup guides, and administrative audit inspection procedures.',
+                  'व्यापक एंड-टू-एंड उपयोगकर्ता मैनुअल, एनोटेटेड एप्लिकेशन स्क्रीनशॉट, क्रिप्टोग्राफ़िक फ़्लोचार्ट, 2FA सेटअप गाइड और प्रशासनिक ऑडिट निरीक्षण प्रक्रियाएं शामिल हैं।'
+                )}
               </p>
             </div>
             <div>
@@ -509,7 +584,7 @@ export const LandingPage: React.FC = () => {
                   boxShadow: '0 4px 12px rgba(33, 74, 171, 0.25)',
                 }}
               >
-                <span>Download Manual (PDF)</span>
+                <span>{t('Download Manual (PDF)', 'मैनुअल डाउनलोड करें (PDF)')}</span>
                 <span>↓</span>
               </a>
             </div>

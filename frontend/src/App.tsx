@@ -14,9 +14,11 @@ import { Footer } from './components/Footer'
 import { CookieBanner } from './components/CookieBanner'
 import { api, setAuthToken } from './api/client'
 import { getStoredPrivateKey, clearStoredPrivateKey } from './crypto/keystore'
+import { LanguageProvider, useLanguage } from './context/LanguageContext'
 
 const BackendStatusIndicator: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean | null>(null)
+  const { isHindi } = useLanguage()
 
   useEffect(() => {
     let mounted = true
@@ -41,7 +43,7 @@ const BackendStatusIndicator: React.FC = () => {
   return (
     <div
       className={`status-indicator ${isOnline ? 'status-online' : 'status-offline'}`}
-      title={isOnline ? 'FastAPI Backend connection healthy' : 'Backend connection unavailable'}
+      title={isOnline ? 'Backend connection healthy' : 'Backend connection unavailable'}
       style={{
         position: 'fixed',
         bottom: '1.5rem',
@@ -69,27 +71,22 @@ const BackendStatusIndicator: React.FC = () => {
           backgroundColor: isOnline ? '#198754' : '#DC3545',
         }}
       />
-      Server: {isOnline ? 'Online' : 'Offline'}
+      {isHindi ? 'सर्वर: ' : 'Server: '}
+      {isOnline ? (isHindi ? 'ऑनलाइन' : 'Online') : (isHindi ? 'ऑफ़लाइन' : 'Offline')}
     </div>
   )
 }
 
-export default function App() {
+const AppContent: React.FC = () => {
   const navigate = useNavigate()
+  const { language, toggleLanguage, t } = useLanguage()
+
   const [currentUser, setCurrentUser] = useState<string | null>(() => localStorage.getItem('sfs_username'))
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem('sfs_is_admin') === 'true')
   const [lastLoginAt, setLastLoginAt] = useState<string | null>(() => localStorage.getItem('sfs_last_login'))
   const [unreadCount, setUnreadCount] = useState<number>(0)
   const [hasPrivateKey, setHasPrivateKey] = useState<boolean>(false)
   const [toastMessage, setToastMessage] = useState<string>('')
-  const [language, setLanguage] = useState<'en' | 'hi'>('en')
-
-  // Dynamic Language Switch (DBIM Section 7.5.1 ii)
-  const toggleLanguage = () => {
-    const nextLang = language === 'en' ? 'hi' : 'en'
-    setLanguage(nextLang)
-    document.documentElement.lang = nextLang
-  }
 
   const checkUnread = async () => {
     if (!currentUser) {
@@ -150,39 +147,50 @@ export default function App() {
     return () => clearInterval(interval)
   }, [currentUser])
 
-  const handleLoginSuccess = (username: string, adminStatus: boolean = false, lastLogin?: string | null) => {
-    localStorage.setItem('sfs_username', username)
-    localStorage.setItem('sfs_is_admin', adminStatus ? 'true' : 'false')
-    if (lastLogin) {
-      localStorage.setItem('sfs_last_login', lastLogin)
-      setLastLoginAt(lastLogin)
-    }
+  const handleLoginSuccess = (username: string, adminFlag: boolean) => {
     setCurrentUser(username)
-    setIsAdmin(adminStatus)
+    setIsAdmin(adminFlag)
+    getStoredPrivateKey(username).then(key => setHasPrivateKey(!!key)).catch(() => setHasPrivateKey(false))
+    refreshProfile()
+    checkUnread()
+    setToastMessage(t(`Welcome back, ${username}!`, `वापसी पर स्वागत है, ${username}!`))
+    setTimeout(() => setToastMessage(''), 4000)
+    navigate(adminFlag ? '/admin' : '/inbox')
   }
 
   const handleDeleteAccount = async () => {
-    if (!currentUser || isAdmin) return
-    const confirmed = window.confirm(
-      'Delete your account permanently? Your queued encrypted transfers and account metadata will be removed. This cannot be undone.'
+    const confirmText = t(
+      'Are you sure you want to permanently delete your account? All keys and pending transfers will be purged.',
+      'क्या आप वाकई अपना खाता स्थायी रूप से हटाना चाहते हैं? सभी कुंजियाँ और लंबित स्थानांतरण मिटा दिए जाएंगे।'
     )
-    if (!confirmed) return
-
+    if (!window.confirm(confirmText)) {
+      return
+    }
     try {
       await api.auth.deleteAccount()
-      await clearStoredPrivateKey(currentUser)
+      if (currentUser) {
+        await clearStoredPrivateKey(currentUser)
+      }
       handleLogout()
-      setToastMessage('Your account has been successfully deleted.')
-      setTimeout(() => setToastMessage(''), 5000)
-      navigate('/', { replace: true })
+      setToastMessage(t('Your account has been deleted permanently.', 'आपका खाता स्थायी रूप से हटा दिया गया है।'))
+      setTimeout(() => setToastMessage(''), 4000)
+      navigate('/')
     } catch (err: any) {
-      window.alert(err.message || 'Account deletion failed. Please try again.')
+      alert(err.message || t('Failed to delete account.', 'खाता हटाने में विफल।'))
     }
   }
 
   return (
-    <div className="app-container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF' }}>
-      {/* Header conforming to GoI DBIM v3 Standards */}
+    <div
+      className="app-container"
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#FFFFFF',
+        color: '#150202',
+      }}
+    >
       <Header
         user={currentUser}
         isAdmin={isAdmin}
@@ -195,21 +203,39 @@ export default function App() {
       />
 
       {toastMessage && (
-        <div className="toast-notification" style={{ position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 10000, background: '#E6F4EA', border: '1px solid #198754', padding: '0.85rem 1.25rem', borderRadius: '8px', color: '#198754', fontWeight: 600 }}>
+        <div
+          className="toast-notification"
+          style={{
+            position: 'fixed',
+            top: '1.5rem',
+            right: '1.5rem',
+            zIndex: 10000,
+            background: '#E6F4EA',
+            border: '1px solid #198754',
+            padding: '0.85rem 1.25rem',
+            borderRadius: '8px',
+            color: '#198754',
+            fontWeight: 600,
+          }}
+        >
           {toastMessage}
         </div>
       )}
 
       <BackendStatusIndicator />
 
-      {/* Main Content Area with Skip Link anchor id (WCAG 2.1 / GIGW 3.0) */}
+      {/* Main Content Area with Skip Link anchor id */}
       <main id="main-content" className="main-content" style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
         {currentUser && !hasPrivateKey && !isAdmin && (
           <div style={{ maxWidth: '1100px', margin: '1rem auto 0', padding: '0 1rem' }}>
             <div className="alert alert-info" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span>ℹ️</span>
               <div>
-                <strong>Crypto Key Alert:</strong> Long-term private key not detected in your browser&apos;s IndexedDB. Generate or restore your cryptographic identity on the Register page.
+                <strong>{t('Crypto Key Alert:', 'क्रिप्टो कुंजी चेतावनी:')}</strong>{' '}
+                {t(
+                  "Long-term private key not detected in your browser's IndexedDB. Generate or restore your cryptographic identity on the Register page.",
+                  'आपके ब्राउज़र के IndexedDB में दीर्घकालिक निजी कुंजी नहीं मिली। पंजीकरण पृष्ठ पर अपनी क्रिप्टोग्राफ़िक पहचान उत्पन्न करें या पुनर्स्थापित करें।'
+                )}
               </div>
             </div>
           </div>
@@ -220,7 +246,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
 
           {/* User Authentication & Services */}
-          <Route path="/register" element={<RegisterPage onRegisterSuccess={handleLoginSuccess} />} />
+          <Route path="/register" element={<RegisterPage onRegisterSuccess={(uname) => handleLoginSuccess(uname, false)} />} />
           <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -237,12 +263,17 @@ export default function App() {
               ) : (
                 <div className="page-shell page-shell-narrow" style={{ padding: '2rem 1rem' }}>
                   <div className="glass-card text-center" style={{ background: '#FFFFFF', border: '1px solid #EBEAEA', borderRadius: '12px', padding: '2rem' }}>
-                    <h2 style={{ color: '#DC3545', marginBottom: '1rem' }}>Administrative Access Restricted</h2>
+                    <h2 style={{ color: '#DC3545', marginBottom: '1rem' }}>
+                      {t('Administrative Access Restricted', 'प्रशासनिक पहुँच प्रतिबंधित')}
+                    </h2>
                     <p style={{ color: '#606060', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-                      System Audit Logs and Forensic Oversight are restricted to authorized administrators only.
+                      {t(
+                        'System Audit Logs and Forensic Oversight are restricted to authorized administrators only.',
+                        'सिस्टम ऑडिट लॉग और फोरेंसिक निगरानी केवल अधिकृत प्रशासकों तक सीमित है।'
+                      )}
                     </p>
                     <Link to="/login" className="btn-primary" style={{ backgroundColor: '#214AAB' }}>
-                      Sign in as Administrator
+                      {t('Sign in as Administrator', 'प्रशासक के रूप में साइन इन करें')}
                     </Link>
                   </div>
                 </div>
@@ -256,8 +287,16 @@ export default function App() {
       {/* Light Color Theme Footer */}
       <Footer />
 
-      {/* DPDP Act 2023 Compliant Cookie Consent Banner */}
+      {/* Cookie Consent Banner */}
       <CookieBanner />
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   )
 }
