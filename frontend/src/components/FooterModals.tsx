@@ -125,6 +125,16 @@ export const FooterModals: React.FC<FooterModalsProps> = ({ activeModal, onClose
                 'यह पोर्टल उच्च कंट्रास्ट मोड, टेक्स्ट आकार बदलने और कीबोर्ड नेविगेशन सहित WCAG 2.1 स्तर AA सुगम्यता मानकों को शामिल करता है।'
               )}
             </p>
+
+            <h4 style={{ color: '#162F6A', fontSize: '1rem', margin: '0.75rem 0 0.25rem' }}>
+              {t('4. Copyright & Academic Intellectual Property', '4. कॉपीराइट एवं शैक्षणिक बौद्धिक संपदा')}
+            </h4>
+            <p style={{ color: '#606060', margin: '0 0 0.75rem' }}>
+              {t(
+                '© 2026 National Institute of Technology Karnataka (NITK), Surathkal. All rights reserved. Created for the IT303 Software Engineering curriculum under the guidance of Dr. Jaidhar C D.',
+                '© 2026 राष्ट्रीय प्रौद्योगिकी संस्थान कर्नाटक (NITK), सुरथकल। सर्वाधिकार सुरक्षित। डॉ. जैधर सी डी के मार्गदर्शन में IT303 सॉफ्टवेयर इंजीनियरिंग पाठ्यक्रम के लिए निर्मित।'
+              )}
+            </p>
           </div>
         )}
 
@@ -387,6 +397,10 @@ export const FooterModals: React.FC<FooterModalsProps> = ({ activeModal, onClose
                     Secure_File_Sharing_User_Manual.pdf (15 Pages) ↗
                   </a>
                 </div>
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '0.85rem', borderTop: '1px solid #EBEAEA', fontSize: '0.8rem', color: '#606060' }}>
+                © {new Date().getFullYear()} {t('National Institute of Technology Karnataka (NITK), Surathkal. All rights reserved.', 'राष्ट्रीय प्रौद्योगिकी संस्थान कर्नाटक (NITK), सुरथकल। सर्वाधिकार सुरक्षित।')}
               </div>
             </div>
           </div>

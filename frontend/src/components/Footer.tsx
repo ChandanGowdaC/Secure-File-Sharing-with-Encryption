@@ -173,10 +173,10 @@ export const Footer: React.FC = () => {
           >
             <div>
               <p style={{ margin: 0, fontWeight: 700, color: '#150202' }}>
-                {t('Secure File Sharing with Client-Side Encryption', 'सुरक्षित फ़ाइल साझाकरण (क्लाइंट-साइड एन्क्रिप्शन)')}
+                © {new Date().getFullYear()} {t('Secure File Sharing with Client-Side Encryption', 'सुरक्षित फ़ाइल साझाकरण (क्लाइंट-साइड एन्क्रिप्शन)')}
               </p>
               <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: '#162F6A', fontWeight: 600 }}>
-                {t('IT303 Software Engineering Course Project • NITK Surathkal', 'आईटी303 सॉफ्टवेयर इंजीनियरिंग कोर्स प्रोजेक्ट • एनआईटीके सुरथकल')}
+                © {t('IT303 Software Engineering Course Project • NITK Surathkal', 'आईटी303 सॉफ्टवेयर इंजीनियरिंग कोर्स प्रोजेक्ट • एनआईटीके सुरथकल')}
               </p>
               <p style={{ margin: '2px 0 0', fontSize: '0.78rem' }}>
                 {t('Developed by', 'विकासकर्ता:')} <strong>{t('Prabhav P', 'प्रभाव पी')} (241IT053)</strong>, <strong>{t('Sucheth K Katte', 'सुचेत के कट्टे')} (241IT078)</strong>, {t('and', 'और')} <strong>{t('Chandan Gowda C', 'चंदन गौड़ा सी')} (241IT016)</strong>
@@ -192,12 +192,29 @@ export const Footer: React.FC = () => {
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontWeight: 600, color: '#150202' }}>
                 {t('Last Updated On:', 'अंतिम अद्यतन:')}{' '}
-                <span style={{ color: '#214AAB' }}>{isHindi ? '15 अक्टूबर 2026' : '15 October 2026'}</span>
+                <span style={{ color: '#214AAB' }}>{isHindi ? '16 अक्टूबर 2026' : '16 October 2026'}</span>
               </div>
               <div style={{ fontSize: '0.75rem', marginTop: '2px' }}>
-                {t('Software Engineering Project • Zero Plaintext Retention', 'सॉफ्टवेयर इंजीनियरिंग प्रोजेक्ट • शून्य प्लेनटेक्स्ट प्रतिधारण')}
+                © {new Date().getFullYear()} {t('Software Engineering Project • Zero Plaintext Retention', 'सॉफ्टवेयर इंजीनियरिंग प्रोजेक्ट • शून्य प्लेनटेक्स्ट प्रतिधारण')}
               </div>
             </div>
+          </div>
+
+          {/* Dedicated Bottom Copyright Bar */}
+          <div
+            style={{
+              marginTop: '1.25rem',
+              paddingTop: '0.85rem',
+              borderTop: '1px solid #EBEAEA',
+              textAlign: 'center',
+              fontSize: '0.78rem',
+              color: '#606060',
+            }}
+          >
+            © {new Date().getFullYear()} {t(
+              'National Institute of Technology Karnataka (NITK), Surathkal. All rights reserved.',
+              'राष्ट्रीय प्रौद्योगिकी संस्थान कर्नाटक (NITK), सुरथकल। सर्वाधिकार सुरक्षित।'
+            )}
           </div>
         </div>
       </footer>
