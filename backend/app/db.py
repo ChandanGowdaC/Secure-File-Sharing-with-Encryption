@@ -52,6 +52,7 @@ def init_db(reset: bool = False) -> None:
     _ensure_transfer_file_size_column()
     _ensure_user_last_login_column()
     _ensure_activity_logs_table()
+    _repair_corrupted_activity_log_details()
 
 
 def reset_entire_system() -> dict[str, str]:
@@ -130,6 +131,27 @@ def _ensure_activity_logs_table() -> None:
     inspector = inspect(engine)
     if "activity_logs" not in inspector.get_table_names():
         Base.metadata.tables["activity_logs"].create(bind=engine)
+
+
+def _repair_corrupted_activity_log_details() -> None:
+    inspector = inspect(engine)
+    if "activity_logs" not in inspector.get_table_names():
+        return
+    try:
+        from app.models import ActivityLog
+        from app.services.audit import format_details_with_units
+        with SessionLocal() as db:
+            corrupted = (
+                db.query(ActivityLog)
+                .filter(ActivityLog.details.like("%b.%") | ActivityLog.details.like("%B.%"))
+                .all()
+            )
+            for row in corrupted:
+                row.details = format_details_with_units(row.details)
+            if corrupted:
+                db.commit()
+    except Exception:
+        pass
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -28,16 +28,49 @@ interface ActivityEntry {
   timestamp: string
 }
 
+function formatFileSize(bytes: number): string {
+  if (isNaN(bytes) || bytes < 0) return '-'
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${Number.isInteger(bytes) ? bytes : bytes.toFixed(2)} B`
+}
+
 function formatActivityDetails(details?: string | null): string {
   if (!details) return '-'
-  return details.replace(/(size:\s*)(\d+)(?!\s*[kmgt]?b)/gi, (_, prefix, num) => {
-    const bytes = Number(num)
-    if (isNaN(bytes) || bytes <= 0) return `${prefix}${num}`
-    if (bytes >= 1024 * 1024 * 1024) return `${prefix}${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-    if (bytes >= 1024 * 1024) return `${prefix}${(bytes / (1024 * 1024)).toFixed(2)} MB`
-    if (bytes >= 1024) return `${prefix}${(bytes / 1024).toFixed(1)} KB`
-    return `${prefix}${bytes} B`
-  })
+
+  // 1. Repair any corrupted patterns where "B" was mistakenly inserted before decimal point:
+  // e.g., "Size: 7 B.16" -> "Size: 7.16 B", "Size: 7 B.16 MB" -> "Size: 7.16 MB"
+  const cleaned = details.replace(
+    /(size:\s*)(\d+)\s*b\s*\.\s*(\d+)(?:\s*([kmgt]?b|bytes?))?/gi,
+    (_, prefix, intPart, decPart, unit) => {
+      if (unit) {
+        let u = unit.trim().toUpperCase()
+        if (u.startsWith('BYTE')) u = 'B'
+        return `${prefix}${intPart}.${decPart} ${u}`
+      }
+      return `${prefix}${intPart}.${decPart} B`
+    }
+  )
+
+  // 2. Format size values following "Size: "
+  return cleaned.replace(
+    /(size:\s*)(\d+(?:\.\d+)?)(?:\s*([kmgt]?b|bytes?)\b)?/gi,
+    (match, prefix, numStr, existingUnit) => {
+      if (existingUnit) {
+        let u = existingUnit.trim().toUpperCase()
+        if (u.startsWith('BYTE')) u = 'B'
+        return `${prefix}${numStr} ${u}`
+      }
+      const val = Number(numStr)
+      if (isNaN(val) || val < 0) return match
+      if (Number.isInteger(val)) {
+        return `${prefix}${formatFileSize(val)}`
+      } else {
+        return `${prefix}${numStr} B`
+      }
+    }
+  )
 }
 
 export const AdminPage: React.FC = () => {

@@ -400,6 +400,37 @@ def test_admin_endpoints_and_activity_pdf_generation():
     assert pdf_resp.content.startswith(b"%PDF-")
 
 
+def test_activity_log_file_size_formatting():
+    """Verify file sizes in activity logs are formatted correctly and never corrupted like '7 B.16'."""
+    from app.services.audit import format_details_with_units, format_file_size
+
+    assert format_file_size(7507968) == "7.16 MB"
+    assert format_file_size(2048) == "2.0 KB"
+    assert format_file_size(500) == "500 B"
+    assert format_file_size(7.16) == "7.16 B"
+
+    # Test repair of corrupted string patterns
+    assert format_details_with_units("To: alice, Size: 7 B.16") == "To: alice, Size: 7.16 B"
+    assert format_details_with_units("To: alice, Size: 7 B.16 MB") == "To: alice, Size: 7.16 MB"
+    assert format_details_with_units("To: alice, Size: 7 B.16 KB") == "To: alice, Size: 7.16 KB"
+    assert format_details_with_units("To: alice, Size: 7 B.16 GB") == "To: alice, Size: 7.16 GB"
+
+    # Test preservation of valid strings
+    assert format_details_with_units("To: alice, Size: 7.16 MB") == "To: alice, Size: 7.16 MB"
+    assert format_details_with_units("To: alice, Size: 7.16 KB") == "To: alice, Size: 7.16 KB"
+    assert format_details_with_units("To: alice, Size: 7.16 B") == "To: alice, Size: 7.16 B"
+    assert format_details_with_units("To: alice, Size: 500 B") == "To: alice, Size: 500 B"
+
+    # Test formatting of raw integer byte counts
+    assert format_details_with_units("To: alice, Size: 7507968") == "To: alice, Size: 7.16 MB"
+    assert format_details_with_units("To: alice, Size: 2048") == "To: alice, Size: 2.0 KB"
+    assert format_details_with_units("To: alice, Size: 500") == "To: alice, Size: 500 B"
+
+    # Test non-size strings preserved
+    assert format_details_with_units("Login from 192.168.1.1") == "Login from 192.168.1.1"
+    assert format_details_with_units(None) == "-"
+
+
 def test_account_deletion_and_forensic_preservation():
     """Verify deleting account removes user record but preserves logs for police/legal enquiry."""
     client.post("/api/v1/auth/register", json={

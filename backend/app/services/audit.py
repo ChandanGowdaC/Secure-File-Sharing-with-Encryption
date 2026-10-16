@@ -65,7 +65,7 @@ def get_transfer_logs(db: Session, query: TransferLogQuery) -> TransferLogRespon
     return TransferLogResponse(entries=entries)
 
 
-def format_file_size(size_bytes: int | None) -> str:
+def format_file_size(size_bytes: int | float | None) -> str:
     """Format numeric bytes into human-readable units (B, KB, MB, GB)."""
     if size_bytes is None or size_bytes < 0:
         return "-"
@@ -75,20 +75,63 @@ def format_file_size(size_bytes: int | None) -> str:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
     if size_bytes >= 1024:
         return f"{size_bytes / 1024:.1f} KB"
-    return f"{size_bytes} B"
+    if isinstance(size_bytes, float) and not size_bytes.is_integer():
+        return f"{size_bytes:.2f} B"
+    return f"{int(size_bytes)} B"
 
 
 def format_details_with_units(details: str | None) -> str:
-    """Ensure any raw numeric byte size in details strings has proper units attached."""
+    """Ensure any raw numeric byte size in details strings has proper units attached,
+    and repair any previously corrupted format like 'Size: 7 B.16' or 'Size: 7 B.16 MB'."""
     if not details:
         return "-"
-    def repl(m: re.Match) -> str:
-        prefix = m.group(1)
-        raw_num = int(m.group(2))
-        return f"{prefix}{format_file_size(raw_num)}"
 
-    # Match "Size: <digits>" or "size: <digits>" not followed by an existing unit (B, KB, MB, etc.)
-    return re.sub(r"(?i)(size:\s*)(\d+)(?!\s*(?:[kmgt]?b|bytes?))", repl, details)
+    # 1. Repair any corrupted patterns where "B" was mistakenly inserted before decimal point:
+    # e.g., "Size: 7 B.16 MB" -> "Size: 7.16 MB", "Size: 7 B.16" -> "Size: 7.16 B"
+    def fix_corrupted(m: re.Match) -> str:
+        prefix = m.group(1)
+        int_part = m.group(2)
+        dec_part = m.group(3)
+        unit = m.group(4)
+        if unit:
+            unit_clean = unit.strip().upper()
+            if unit_clean.startswith("BYTE"):
+                unit_clean = "B"
+            return f"{prefix}{int_part}.{dec_part} {unit_clean}"
+        return f"{prefix}{int_part}.{dec_part} B"
+
+    cleaned = re.sub(
+        r"(?i)(size:\s*)(\d+)\s*b\s*\.\s*(\d+)(?:\s*([kmgt]?b|bytes?))?",
+        fix_corrupted,
+        details,
+    )
+
+    # 2. Format size values following "Size: "
+    def repl_size(m: re.Match) -> str:
+        prefix = m.group(1)
+        num_str = m.group(2)
+        existing_unit = m.group(3)
+        if existing_unit:
+            # Already has a unit attached (e.g. "7.16 MB", "500 B") -> standardize unit casing
+            unit_clean = existing_unit.strip().upper()
+            if unit_clean.startswith("BYTE"):
+                unit_clean = "B"
+            return f"{prefix}{num_str} {unit_clean}"
+        # No unit attached: raw numeric bytes
+        try:
+            val = float(num_str)
+            if val.is_integer():
+                return f"{prefix}{format_file_size(int(val))}"
+            else:
+                return f"{prefix}{num_str} B"
+        except (ValueError, TypeError):
+            return m.group(0)
+
+    return re.sub(
+        r"(?i)(size:\s*)(\d+(?:\.\d+)?)(?:\s*([kmgt]?b|bytes?)\b)?",
+        repl_size,
+        cleaned,
+    )
 
 
 def log_activity(
