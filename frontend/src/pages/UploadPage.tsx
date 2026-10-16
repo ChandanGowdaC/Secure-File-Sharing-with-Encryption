@@ -7,6 +7,46 @@ import { encryptFile } from '../crypto/aes-gcm'
 import { IconUpload, IconLock } from '../components/LineIcons'
 import { useLanguage } from '../context/LanguageContext'
 
+interface RegisteredUser {
+  username: string
+  displayName: string
+  roleEn: string
+  roleHi: string
+  email: string
+  badgeEn: string
+  badgeHi: string
+}
+
+const REGISTERED_USERS: RegisteredUser[] = [
+  {
+    username: 'demo',
+    displayName: 'Demo User',
+    roleEn: 'Evaluation & Test User',
+    roleHi: 'मूल्यांकन एवं परीक्षण खाता',
+    email: 'demo@sfs.gov.in',
+    badgeEn: 'Demo Account',
+    badgeHi: 'डेमो खाता',
+  },
+  {
+    username: 'chandan',
+    displayName: 'Chandan Gowda C',
+    roleEn: 'Project Developer (241IT016)',
+    roleHi: 'परियोजना विकासकर्ता (241IT016)',
+    email: 'chandangowdac666@gmail.com',
+    badgeEn: 'Verified Member',
+    badgeHi: 'सत्यापित सदस्य',
+  },
+  {
+    username: 'withprabhav',
+    displayName: 'Prabhav P',
+    roleEn: 'Project Developer (241IT053)',
+    roleHi: 'परियोजना विकासकर्ता (241IT053)',
+    email: 'prabhav.241it053@nitk.edu.in',
+    badgeEn: 'Verified Member',
+    badgeHi: 'सत्यापित सदस्य',
+  },
+]
+
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
 const SUPPORTED_EXTENSIONS = [
   'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'jpg', 'jpeg', 'png',
@@ -23,6 +63,8 @@ function formatFileSize(bytes: number) {
 export const UploadPage: React.FC = () => {
   const { t } = useLanguage()
   const [receiverUsername, setReceiverUsername] = useState('')
+  const [showUsersModal, setShowUsersModal] = useState(false)
+  const [userFilter, setUserFilter] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -244,6 +286,14 @@ export const UploadPage: React.FC = () => {
     }
   }
 
+  const filteredUsers = REGISTERED_USERS.filter(
+    u =>
+      u.username.toLowerCase().includes(userFilter.toLowerCase()) ||
+      u.displayName.toLowerCase().includes(userFilter.toLowerCase()) ||
+      u.email.toLowerCase().includes(userFilter.toLowerCase()) ||
+      u.roleEn.toLowerCase().includes(userFilter.toLowerCase())
+  )
+
   const isFormValid = !!file && receiverUsername.trim().length > 0 && !recipientStatus?.hasActive
 
   return (
@@ -361,15 +411,63 @@ export const UploadPage: React.FC = () => {
         <form onSubmit={handleUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Field 1: Recipient Username */}
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="receiverUsername" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', marginBottom: '4px', display: 'block' }}>
-              {t('Recipient Username', 'प्राप्तकर्ता उपयोगकर्ता नाम')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+              <label htmlFor="receiverUsername" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#150202', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {t('Recipient Username', 'प्राप्तकर्ता उपयोगकर्ता नाम')} <span style={{ color: '#DC3545' }}>*</span> <span style={{ fontSize: '0.75rem', color: '#606060' }}>({t('Required', 'अनिवार्य')})</span>
+              </label>
+              <button
+                type="button"
+                id="check-registered-users-btn"
+                onClick={() => {
+                  setShowUsersModal(true)
+                  setUserFilter('')
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#EEF2FF',
+                  border: '1px solid #A3BBF3',
+                  color: '#162F6A',
+                  padding: '0.24rem 0.6rem',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#D2DFFF')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#EEF2FF')}
+                title={t('Check list of registered users eligible to receive files', 'फ़ाइलें प्राप्त करने के पात्र पंजीकृत उपयोगकर्ताओं की सूची जांचें')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>{t('Check Registered Users', 'पंजीकृत उपयोगकर्ता देखें')}</span>
+                <span
+                  style={{
+                    backgroundColor: '#214AAB',
+                    color: '#FFFFFF',
+                    borderRadius: '10px',
+                    fontSize: '0.7rem',
+                    padding: '1px 6px',
+                    fontWeight: 700,
+                  }}
+                >
+                  3
+                </span>
+              </button>
+            </div>
+
             <input
               id="receiverUsername"
               type="text"
               required
               className="form-control"
-              placeholder={t('e.g. bob or user_id', 'उदा. bob या user_id')}
+              placeholder={t('e.g. demo, chandan, withprabhav', 'उदा. demo, chandan, withprabhav')}
               value={receiverUsername}
               onChange={e => setReceiverUsername(e.target.value)}
               style={{
@@ -377,6 +475,60 @@ export const UploadPage: React.FC = () => {
                 border: recipientStatus?.hasActive ? '1px solid #DC3545' : '1px solid #C6C6C6',
               }}
             />
+
+            {/* Quick-Pick Registered Users */}
+            <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+              <span style={{ fontSize: '0.76rem', color: '#606060', fontWeight: 600 }}>
+                {t('Registered Users:', 'पंजीकृत उपयोगकर्ता:')}
+              </span>
+              {REGISTERED_USERS.map(user => {
+                const isSelected = receiverUsername.trim().toLowerCase() === user.username.toLowerCase()
+                return (
+                  <button
+                    key={user.username}
+                    type="button"
+                    onClick={() => setReceiverUsername(user.username)}
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '14px',
+                      border: isSelected ? '1px solid #214AAB' : '1px solid #CBD5E1',
+                      backgroundColor: isSelected ? '#214AAB' : '#F8FAFC',
+                      color: isSelected ? '#FFFFFF' : '#162F6A',
+                      fontWeight: isSelected ? 700 : 500,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Click to select @${user.username}`}
+                  >
+                    <span>@{user.username}</span>
+                    {isSelected && <span style={{ fontSize: '0.7rem' }}>✓</span>}
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUsersModal(true)
+                  setUserFilter('')
+                }}
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#214AAB',
+                  background: 'none',
+                  border: 'none',
+                  padding: '0 4px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                }}
+              >
+                {t('Check All (3) ↗', 'सभी जांचें (3) ↗')}
+              </button>
+            </div>
             {recipientStatus?.hasActive && (
               <div
                 style={{
@@ -539,6 +691,258 @@ export const UploadPage: React.FC = () => {
             )}
           </button>
         </form>
+
+        {/* Registered Users Modal */}
+        {showUsersModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registered-users-modal-title"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(21, 2, 2, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100000,
+              padding: '1rem',
+            }}
+            onClick={() => setShowUsersModal(false)}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                border: '2px solid #EBEAEA',
+                borderRadius: '12px',
+                maxWidth: '560px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '1.75rem',
+                boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '10px',
+                      backgroundColor: '#D2DFFF',
+                      color: '#162F6A',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 id="registered-users-modal-title" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#162F6A' }}>
+                      {t('Registered Users Directory', 'पंजीकृत उपयोगकर्ता निर्देशिका')}
+                    </h2>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#606060' }}>
+                      {t('Select an active registered user to receive encrypted files', 'एन्क्रिप्टेड फ़ाइल प्राप्त करने के लिए सक्रिय पंजीकृत उपयोगकर्ता चुनें')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowUsersModal(false)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    lineHeight: '1',
+                    color: '#606060',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                  }}
+                  aria-label="Close modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Search Filter Bar */}
+              <div style={{ marginBottom: '1rem' }}>
+                <input
+                  type="text"
+                  placeholder={t('Filter by username, name, or role...', 'उपयोगकर्ता नाम, नाम या भूमिका से खोजें...')}
+                  value={userFilter}
+                  onChange={e => setUserFilter(e.target.value)}
+                  className="form-control"
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.85rem',
+                    fontSize: '0.85rem',
+                    border: '1px solid #C6C6C6',
+                    borderRadius: '6px',
+                    backgroundColor: '#F8FAFC',
+                  }}
+                />
+              </div>
+
+              {/* List of Registered Users */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                {filteredUsers.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: '#606060', fontSize: '0.88rem' }}>
+                    {t('No registered user matches your search.', 'आपकी खोज से मेल खाता कोई पंजीकृत उपयोगकर्ता नहीं मिला।')}
+                  </div>
+                ) : (
+                  filteredUsers.map(user => {
+                    const isSelected = receiverUsername.trim().toLowerCase() === user.username.toLowerCase()
+                    return (
+                      <div
+                        key={user.username}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.85rem 1rem',
+                          borderRadius: '8px',
+                          border: isSelected ? '2px solid #214AAB' : '1px solid #EBEAEA',
+                          backgroundColor: isSelected ? '#F0F4FF' : '#FFFFFF',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                          <div
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '50%',
+                              backgroundColor: isSelected ? '#214AAB' : '#D2DFFF',
+                              color: isSelected ? '#FFFFFF' : '#162F6A',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '0.92rem',
+                            }}
+                          >
+                            {user.username.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, color: '#162F6A', fontSize: '0.95rem' }}>
+                                @{user.username}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#E2FBE8',
+                                  color: '#198754',
+                                  fontWeight: 600,
+                                  border: '1px solid #A3E6B4',
+                                }}
+                              >
+                                {t('Active Key', 'सक्रिय कुंजी')}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#150202', fontWeight: 500, marginTop: '2px' }}>
+                              {user.displayName}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: '#606060' }}>
+                              {t(user.roleEn, user.roleHi)} • {user.email}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReceiverUsername(user.username)
+                            setShowUsersModal(false)
+                          }}
+                          style={{
+                            backgroundColor: isSelected ? '#198754' : '#214AAB',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            whiteSpace: 'nowrap',
+                            transition: 'background-color 0.15s ease',
+                          }}
+                        >
+                          {isSelected ? (
+                            <>
+                              <span>✓</span>
+                              <span>{t('Selected', 'चयनित')}</span>
+                            </>
+                          ) : (
+                            <span>{t('Select Recipient', 'प्राप्तकर्ता चुनें')}</span>
+                          )}
+                        </button>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Modal Info & Close */}
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #EBEAEA',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.8rem',
+                  color: '#606060',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '1rem',
+                }}
+              >
+                <span>🔒</span>
+                <span>
+                  {t(
+                    'Selecting a user sets the recipient username and initiates ECDH P-256 key agreement for client encryption.',
+                    'उपयोगकर्ता चुनने से प्राप्तकर्ता का नाम सेट होता है और क्लाइंट एन्क्रिप्शन के लिए ECDH P-256 कुंजी समझौता आरंभ होता है।'
+                  )}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowUsersModal(false)}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #C6C6C6',
+                    color: '#150202',
+                    padding: '0.45rem 1.25rem',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('Close', 'बंद करें')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
