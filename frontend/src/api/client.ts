@@ -163,6 +163,16 @@ export const api = {
       }),
   },
   transfers: {
+    checkRecipient: (username: string) => {
+      const query = new URLSearchParams({ username })
+      return request<{
+        can_send: boolean
+        has_active_transfer: boolean
+        recipient_username: string
+        existing_filename?: string | null
+        message?: string | null
+      }>(`/transfers/check-recipient?${query}`)
+    },
     upload: (body: unknown) =>
       request<{ transfer_id: string; status: string; message: string }>('/transfers/upload', {
         method: 'POST',

@@ -6,13 +6,14 @@ import uuid
 from pathlib import PurePath
 from typing import List
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.middleware.errors import AppError
 from app.models import Transfer, User
 from app.schemas.transfers import (
+    CheckRecipientResponse,
     DeliverTransferResponse,
     PendingTransfersResponse,
     ReceivedTransferItem,
@@ -64,6 +65,29 @@ def upload_transfer(
 
     if receiver.id == sender.id:
         raise AppError("Cannot send a file to yourself.", status_code=400)
+
+    # Enforce policy: maximum 1 active file per recipient.
+    # The sender can send another file only after the recipient removes/deletes the existing file from the server.
+    active_transfer = (
+        db.query(Transfer)
+        .filter(
+            Transfer.sender_id == sender.id,
+            Transfer.receiver_id == receiver.id,
+            or_(
+                Transfer.blob_path.isnot(None),
+                Transfer.status.in_([TransferStatus.pending.value, TransferStatus.delivered.value]),
+            ),
+        )
+        .first()
+    )
+    if active_transfer:
+        file_hint = f' ("{active_transfer.original_filename}")' if active_transfer.original_filename else ""
+        raise AppError(
+            f"You already have an active file{file_hint} sent to {receiver.username}. "
+            "You can only send another file once the recipient deletes the existing file from the server.",
+            status_code=400,
+            internal_detail="recipient_has_active_transfer",
+        )
 
     try:
         ciphertext = base64.b64decode(payload.ciphertext, validate=True)
@@ -305,4 +329,57 @@ def deliver_all_pending(db: Session, receiver: User) -> List[DeliverTransferResp
     for item in pending:
         delivered.append(deliver_transfer(db, receiver, item.transfer_id))
     return delivered
+
+
+def check_recipient_status(
+    db: Session,
+    sender: User,
+    receiver_username: str,
+) -> CheckRecipientResponse:
+    clean_username = receiver_username.strip()
+    receiver = db.query(User).filter(func.lower(User.username) == clean_username.lower()).first()
+    if receiver is None:
+        raise AppError(f'Recipient "{clean_username}" not found.', status_code=404, internal_detail="receiver_lookup_failed")
+
+    if receiver.id == sender.id:
+        return CheckRecipientResponse(
+            can_send=False,
+            has_active_transfer=False,
+            recipient_username=receiver.username,
+            message="Cannot send a file to yourself.",
+        )
+
+    active_transfer = (
+        db.query(Transfer)
+        .filter(
+            Transfer.sender_id == sender.id,
+            Transfer.receiver_id == receiver.id,
+            or_(
+                Transfer.blob_path.isnot(None),
+                Transfer.status.in_([TransferStatus.pending.value, TransferStatus.delivered.value]),
+            ),
+        )
+        .first()
+    )
+
+    if active_transfer:
+        file_hint = f' ("{active_transfer.original_filename}")' if active_transfer.original_filename else ""
+        return CheckRecipientResponse(
+            can_send=False,
+            has_active_transfer=True,
+            recipient_username=receiver.username,
+            existing_filename=active_transfer.original_filename,
+            message=(
+                f"You already have an active file{file_hint} sent to {receiver.username}. "
+                "You can only send another file once the recipient deletes the existing file from the server."
+            ),
+        )
+
+    return CheckRecipientResponse(
+        can_send=True,
+        has_active_transfer=False,
+        recipient_username=receiver.username,
+        message=f"Recipient {receiver.username} is eligible to receive a file.",
+    )
+
 

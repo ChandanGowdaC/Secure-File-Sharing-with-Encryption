@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_current_user, get_db
 from app.models import User
 from app.schemas.transfers import (
+    CheckRecipientResponse,
     DeliverTransferResponse,
     DownloadAckRequest,
     PendingTransfersResponse,
@@ -17,6 +18,7 @@ from app.schemas.transfers import (
 )
 from app.services.transfers import (
     acknowledge_download as acknowledge_download_service,
+    check_recipient_status as check_recipient_status_service,
     delete_transfer as delete_transfer_service,
     deliver_transfer as deliver_transfer_service,
     list_pending as list_pending_service,
@@ -35,6 +37,26 @@ def upload_encrypted_transfer(
 ) -> UploadTransferResponse:
     """F.9 – Queue encrypted blob, nonce, tag, and sender ephemeral public key."""
     return upload_transfer_service(db, sender=current_user, payload=payload)
+
+
+@router.get("/check-recipient", response_model=CheckRecipientResponse)
+def check_recipient_query(
+    username: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CheckRecipientResponse:
+    """Check if authenticated sender can send a file to the recipient (max 1 active file per recipient policy)."""
+    return check_recipient_status_service(db, sender=current_user, receiver_username=username)
+
+
+@router.get("/check-recipient/{username}", response_model=CheckRecipientResponse)
+def check_recipient_path(
+    username: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CheckRecipientResponse:
+    """Check if authenticated sender can send a file to the recipient (max 1 active file per recipient policy)."""
+    return check_recipient_status_service(db, sender=current_user, receiver_username=username)
 
 
 @router.get("/pending", response_model=PendingTransfersResponse)

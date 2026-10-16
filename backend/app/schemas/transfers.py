@@ -76,3 +76,12 @@ class ReceivedTransfersResponse(BaseModel):
 class DownloadAckRequest(BaseModel):
     success: bool = True
     decryption_time_ms: Optional[float] = Field(default=None, ge=0, description="Measured client-side decryption duration in ms")
+
+
+class CheckRecipientResponse(BaseModel):
+    can_send: bool
+    has_active_transfer: bool
+    recipient_username: str
+    existing_filename: Optional[str] = None
+    message: Optional[str] = None
+

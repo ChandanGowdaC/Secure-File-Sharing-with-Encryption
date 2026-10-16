@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { generateEphemeralKeyPair } from '../crypto/keypair'
@@ -34,6 +34,41 @@ export const UploadPage: React.FC = () => {
     fileSize: number
   } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [recipientStatus, setRecipientStatus] = useState<{
+    checking: boolean
+    hasActive: boolean
+    canSend: boolean
+    message?: string | null
+    existingFilename?: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    const trimmed = receiverUsername.trim()
+    if (!trimmed) {
+      setRecipientStatus(null)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setRecipientStatus(prev => prev ? { ...prev, checking: true } : { checking: true, hasActive: false, canSend: true })
+        const res = await api.transfers.checkRecipient(trimmed)
+        setRecipientStatus({
+          checking: false,
+          hasActive: res.has_active_transfer,
+          canSend: res.can_send,
+          message: res.message,
+          existingFilename: res.existing_filename,
+        })
+      } catch {
+        // If recipient doesn't exist yet or check fails, reset check
+        setRecipientStatus(null)
+      }
+    }, 450)
+
+    return () => clearTimeout(timer)
+  }, [receiverUsername])
 
   const validateAndSetFile = (selectedFile: File) => {
     setError(null)
@@ -102,10 +137,30 @@ export const UploadPage: React.FC = () => {
 
     setLoading(true)
     setError(null)
-    setStatusMsg(t('Step 1/4: Looking up receiver public key...', 'चरण 1/4: प्राप्तकर्ता की सार्वजनिक कुंजी खोजी जा रही है...'))
+    setStatusMsg(t('Step 1/5: Checking recipient transfer eligibility...', 'चरण 1/5: प्राप्तकर्ता स्थानांतरण पात्रता जांची जा रही है...'))
 
     try {
+      // 0. Pre-flight policy check: sender can have max 1 active file per recipient
+      const checkRes = await api.transfers.checkRecipient(receiverUsername.trim())
+      if (!checkRes.can_send) {
+        setRecipientStatus({
+          checking: false,
+          hasActive: checkRes.has_active_transfer,
+          canSend: false,
+          message: checkRes.message,
+          existingFilename: checkRes.existing_filename,
+        })
+        throw new Error(
+          checkRes.message ||
+            t(
+              `You already have an active file sent to "${receiverUsername.trim()}". You can only send another file once the recipient deletes the existing file from the server.`,
+              `आप पहले ही "${receiverUsername.trim()}" को एक सक्रिय फ़ाइल भेज चुके हैं। आप दूसरी फ़ाइल तभी भेज सकते हैं जब प्राप्तकर्ता मौजूदा फ़ाइल को सर्वर से हटा दे।`
+            )
+        )
+      }
+
       // 1. Fetch receiver's long-term public key
+      setStatusMsg(t('Step 2/5: Looking up receiver public key...', 'चरण 2/5: प्राप्तकर्ता की सार्वजनिक कुंजी खोजी जा रही है...'))
       const keyRes = await api.auth.lookupPublicKey({ username: receiverUsername.trim() })
       if (!keyRes.found || !keyRes.public_key) {
         throw new Error(
@@ -118,8 +173,8 @@ export const UploadPage: React.FC = () => {
 
       setStatusMsg(
         t(
-          'Step 2/4: Generating ephemeral DH keypair & deriving AES-256-GCM key...',
-          'चरण 2/4: क्षणिक DH कुंजी युग्म उत्पन्न करना और AES-256-GCM कुंजी व्युत्पन्न करना...'
+          'Step 3/5: Generating ephemeral DH keypair & deriving AES-256-GCM key...',
+          'चरण 3/5: क्षणिक DH कुंजी युग्म उत्पन्न करना और AES-256-GCM कुंजी व्युत्पन्न करना...'
         )
       )
       // 2. Generate ephemeral key pair
@@ -127,8 +182,8 @@ export const UploadPage: React.FC = () => {
 
       setStatusMsg(
         t(
-          'Step 3/4: Encrypting file locally with AES-256-GCM...',
-          'चरण 3/4: AES-256-GCM के साथ स्थानीय रूप से फ़ाइल एन्क्रिप्ट की जा रही है...'
+          'Step 4/5: Encrypting file locally with AES-256-GCM...',
+          'चरण 4/5: AES-256-GCM के साथ स्थानीय रूप से फ़ाइल एन्क्रिप्ट की जा रही है...'
         )
       )
       const arrayBuffer = await file.arrayBuffer()
@@ -146,8 +201,8 @@ export const UploadPage: React.FC = () => {
 
       setStatusMsg(
         t(
-          'Step 4/4: Uploading ciphertext blob to secure queue...',
-          'चरण 4/4: सिफ़रटेक्स्ट ब्लॉब सुरक्षित कतार में अपलोड किया जा रहा है...'
+          'Step 5/5: Uploading ciphertext blob to secure queue...',
+          'चरण 5/5: सिफ़रटेक्स्ट ब्लॉब सुरक्षित कतार में अपलोड किया जा रहा है...'
         )
       )
       const currentFileName = file.name
@@ -178,6 +233,7 @@ export const UploadPage: React.FC = () => {
       )
       setFile(null)
       setReceiverUsername('')
+      setRecipientStatus(null)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -188,7 +244,7 @@ export const UploadPage: React.FC = () => {
     }
   }
 
-  const isFormValid = !!file && receiverUsername.trim().length > 0
+  const isFormValid = !!file && receiverUsername.trim().length > 0 && !recipientStatus?.hasActive
 
   return (
     <div className="page-shell page-shell-narrow" style={{ padding: '1.5rem 1rem' }}>
@@ -234,6 +290,15 @@ export const UploadPage: React.FC = () => {
             "Enter the recipient's registered username and select a file to encrypt. Both fields marked with an asterisk (*) are mandatory. Maximum file size is 100 MB.",
             'प्राप्तकर्ता का पंजीकृत उपयोगकर्ता नाम दर्ज करें और एन्क्रिप्ट करने के लिए एक फ़ाइल चुनें। तारांकन (*) से चिह्नित दोनों फ़ील्ड अनिवार्य हैं। अधिकतम फ़ाइल आकार 100 MB है।'
           )}
+          <div style={{ marginTop: '0.45rem', color: '#162F6A', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>🔒</span>
+            <span>
+              {t(
+                'Sharing Policy: Max 1 active file per recipient. You can send another file once the recipient deletes the existing file from the server.',
+                'साझाकरण नीति: प्रति प्राप्तकर्ता अधिकतम 1 सक्रिय फ़ाइल। प्राप्तकर्ता द्वारा सर्वर से मौजूदा फ़ाइल हटाने के बाद ही आप दूसरी फ़ाइल भेज सकते हैं।'
+              )}
+            </span>
+          </div>
         </div>
 
         {error && (
@@ -307,8 +372,31 @@ export const UploadPage: React.FC = () => {
               placeholder={t('e.g. bob or user_id', 'उदा. bob या user_id')}
               value={receiverUsername}
               onChange={e => setReceiverUsername(e.target.value)}
-              style={{ backgroundColor: '#FFFFFF', border: '1px solid #C6C6C6' }}
+              style={{
+                backgroundColor: '#FFFFFF',
+                border: recipientStatus?.hasActive ? '1px solid #DC3545' : '1px solid #C6C6C6',
+              }}
             />
+            {recipientStatus?.hasActive && (
+              <div
+                style={{
+                  marginTop: '6px',
+                  padding: '0.55rem 0.85rem',
+                  backgroundColor: '#FFF3CD',
+                  border: '1px solid #FFE69C',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  color: '#664D03',
+                  lineHeight: 1.45,
+                }}
+              >
+                ⚠️ <strong>{t('Active File Limit Reached:', 'सक्रिय फ़ाइल सीमा पूर्ण:')}</strong>{' '}
+                {t(
+                  `You already have an active file${recipientStatus.existingFilename ? ` ("${recipientStatus.existingFilename}")` : ''} sent to ${receiverUsername.trim()}. You can only send another file once this recipient deletes the existing file from the server.`,
+                  `आप पहले ही ${receiverUsername.trim()} को एक सक्रिय फ़ाइल${recipientStatus.existingFilename ? ` ("${recipientStatus.existingFilename}")` : ''} भेज चुके हैं। आप दूसरी फ़ाइल तभी भेज सकेंगे जब प्राप्तकर्ता सर्वर से मौजूदा फ़ाइल को हटा देगा।`
+                )}
+              </div>
+            )}
             <span className="field-help" style={{ color: '#606060', fontSize: '0.78rem', marginTop: '2px', display: 'block' }}>
               {t(
                 "The portal looks up the recipient's registered public key to establish DH agreement.",

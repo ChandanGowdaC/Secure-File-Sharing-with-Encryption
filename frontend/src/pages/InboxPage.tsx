@@ -322,8 +322,8 @@ export const InboxPage: React.FC = () => {
 
   const handleRemoveTransfer = async (transferId: string) => {
     const confirmMsg = t(
-      'Are you sure you want to remove this transfer? The encrypted file will be permanently purged from the server.',
-      'क्या आप वाकई इस स्थानांतरण को हटाना चाहते हैं? एन्क्रिप्टेड फ़ाइल सर्वर से स्थायी रूप से मिटा दी जाएगी।'
+      'Are you sure you want to remove this transfer? The encrypted file will be permanently purged from the server, allowing the sender to send you another file.',
+      'क्या आप वाकई इस स्थानांतरण को हटाना चाहते हैं? एन्क्रिप्टेड फ़ाइल सर्वर से स्थायी रूप से हटा दी जाएगी, जिससे प्रेषक आपको दूसरी फ़ाइल भेज सकेगा।'
     )
     if (!window.confirm(confirmMsg)) {
       return
@@ -343,7 +343,12 @@ export const InboxPage: React.FC = () => {
         }
         return updated
       })
-      setStatusMsg(t('Transfer removed and server copy permanently purged.', 'स्थानांतरण हटा दिया गया और सर्वर कॉपी स्थायी रूप से मिटा दी गई।'))
+      setStatusMsg(
+        t(
+          'Transfer removed and server copy permanently purged. The sender can now send a new file.',
+          'स्थानांतरण हटा दिया गया और सर्वर कॉपी स्थायी रूप से मिटा दी गई। प्रेषक अब एक नई फ़ाइल भेज सकता है।'
+        )
+      )
     } catch (err: any) {
       setError(err.message || t('Failed to remove transfer from server.', 'सर्वर से स्थानांतरण हटाने में विफल।'))
     } finally {

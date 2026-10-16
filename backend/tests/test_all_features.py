@@ -352,6 +352,140 @@ def test_transfer_rejections():
     assert bad_ext.status_code == 415
 
 
+def test_single_active_file_per_recipient_enforcement():
+    """Verify max 1 active file per recipient: sender blocked until receiver explicitly deletes from server."""
+    # Register sender (alice) and receivers (bob and charlie)
+    client.post("/api/v1/auth/register", json={
+        "username": "sender_alice",
+        "email": "alice_test@example.com",
+        "password": "Password123!",
+        "long_term_public_key": "pub_alice",
+    })
+    client.post("/api/v1/auth/register", json={
+        "username": "receiver_bob",
+        "email": "bob_test@example.com",
+        "password": "Password123!",
+        "long_term_public_key": "pub_bob",
+    })
+    client.post("/api/v1/auth/register", json={
+        "username": "receiver_charlie",
+        "email": "charlie_test@example.com",
+        "password": "Password123!",
+        "long_term_public_key": "pub_charlie",
+    })
+
+    # Logins
+    a_log = client.post("/api/v1/auth/login", json={"username_or_email": "sender_alice", "password": "Password123!"})
+    a_mfa = client.post("/api/v1/auth/mfa/verify", json={"username_or_email": "sender_alice", "code": "000000", "mfa_challenge_token": a_log.json()["mfa_challenge_token"]})
+    alice_headers = {"Authorization": f"Bearer {a_mfa.json()['session_token']}"}
+
+    b_log = client.post("/api/v1/auth/login", json={"username_or_email": "receiver_bob", "password": "Password123!"})
+    b_mfa = client.post("/api/v1/auth/mfa/verify", json={"username_or_email": "receiver_bob", "code": "000000", "mfa_challenge_token": b_log.json()["mfa_challenge_token"]})
+    bob_headers = {"Authorization": f"Bearer {b_mfa.json()['session_token']}"}
+
+    c_log = client.post("/api/v1/auth/login", json={"username_or_email": "receiver_charlie", "password": "Password123!"})
+    c_mfa = client.post("/api/v1/auth/mfa/verify", json={"username_or_email": "receiver_charlie", "code": "000000", "mfa_challenge_token": c_log.json()["mfa_challenge_token"]})
+    charlie_headers = {"Authorization": f"Bearer {c_mfa.json()['session_token']}"}
+
+    # 1. Pre-check: Alice can send to Bob
+    check_bob = client.get("/api/v1/transfers/check-recipient?username=receiver_bob", headers=alice_headers)
+    assert check_bob.status_code == 200
+    assert check_bob.json()["can_send"] is True
+    assert check_bob.json()["has_active_transfer"] is False
+
+    # 2. Alice sends file 1 to Bob
+    payload_1 = {
+        "receiver_username": "receiver_bob",
+        "ciphertext": base64.b64encode(b"file_1_content").decode("ascii"),
+        "nonce": base64.b64encode(b"123456789012").decode("ascii"),
+        "auth_tag": base64.b64encode(b"1234567890123456").decode("ascii"),
+        "sender_ephemeral_public_key": "ephemeral_key_1",
+        "original_filename": "file_1.pdf",
+        "file_size_bytes": len(b"file_1_content"),
+    }
+    up_1 = client.post("/api/v1/transfers/upload", headers=alice_headers, json=payload_1)
+    assert up_1.status_code == 201
+    transfer_id_1 = up_1.json()["transfer_id"]
+
+    # 3. Check endpoint now reports Alice is blocked from sending another file to Bob
+    check_bob_blocked = client.get("/api/v1/transfers/check-recipient?username=receiver_bob", headers=alice_headers)
+    assert check_bob_blocked.status_code == 200
+    assert check_bob_blocked.json()["can_send"] is False
+    assert check_bob_blocked.json()["has_active_transfer"] is True
+    assert check_bob_blocked.json()["existing_filename"] == "file_1.pdf"
+
+    # Also check path param version
+    check_path = client.get("/api/v1/transfers/check-recipient/receiver_bob", headers=alice_headers)
+    assert check_path.status_code == 200
+    assert check_path.json()["can_send"] is False
+
+    # 4. Attempt to send file 2 to Bob while file 1 is pending -> MUST BE REJECTED
+    payload_2 = {
+        "receiver_username": "receiver_bob",
+        "ciphertext": base64.b64encode(b"file_2_content").decode("ascii"),
+        "nonce": base64.b64encode(b"123456789012").decode("ascii"),
+        "auth_tag": base64.b64encode(b"1234567890123456").decode("ascii"),
+        "sender_ephemeral_public_key": "ephemeral_key_2",
+        "original_filename": "file_2.pdf",
+        "file_size_bytes": len(b"file_2_content"),
+    }
+    up_2_blocked = client.post("/api/v1/transfers/upload", headers=alice_headers, json=payload_2)
+    assert up_2_blocked.status_code == 400
+    assert "already have an active file" in up_2_blocked.json()["detail"].lower()
+
+    # 5. Independence check: Alice CAN send file 1 to Charlie
+    check_charlie = client.get("/api/v1/transfers/check-recipient?username=receiver_charlie", headers=alice_headers)
+    assert check_charlie.status_code == 200
+    assert check_charlie.json()["can_send"] is True
+
+    payload_charlie = {
+        "receiver_username": "receiver_charlie",
+        "ciphertext": base64.b64encode(b"file_charlie_content").decode("ascii"),
+        "nonce": base64.b64encode(b"123456789012").decode("ascii"),
+        "auth_tag": base64.b64encode(b"1234567890123456").decode("ascii"),
+        "sender_ephemeral_public_key": "ephemeral_key_c",
+        "original_filename": "charlie_doc.txt",
+        "file_size_bytes": len(b"file_charlie_content"),
+    }
+    up_charlie = client.post("/api/v1/transfers/upload", headers=alice_headers, json=payload_charlie)
+    assert up_charlie.status_code == 201
+
+    # And Alice is now blocked from sending a 2nd file to Charlie as well
+    up_charlie_2 = client.post("/api/v1/transfers/upload", headers=alice_headers, json=payload_charlie)
+    assert up_charlie_2.status_code == 400
+
+    # 6. Bob delivers and acks file 1 (downloaded, but NOT removed from server)
+    deliver_resp = client.post(f"/api/v1/transfers/{transfer_id_1}/deliver", headers=bob_headers)
+    assert deliver_resp.status_code == 200
+    ack_resp = client.post(f"/api/v1/transfers/{transfer_id_1}/download-ack", headers=bob_headers, json={"success": True})
+    assert ack_resp.status_code in (200, 204)
+
+    # File is still stored on server -> Alice is STILL blocked from sending to Bob
+    up_2_still_blocked = client.post("/api/v1/transfers/upload", headers=alice_headers, json=payload_2)
+    assert up_2_still_blocked.status_code == 400
+
+    # 7. Bob explicitly removes the file from the server
+    del_resp = client.delete(f"/api/v1/transfers/{transfer_id_1}", headers=bob_headers)
+    assert del_resp.status_code == 204
+
+    # 8. Check endpoint now reports Alice is unblocked for Bob
+    check_bob_unblocked = client.get("/api/v1/transfers/check-recipient?username=receiver_bob", headers=alice_headers)
+    assert check_bob_unblocked.status_code == 200
+    assert check_bob_unblocked.json()["can_send"] is True
+    assert check_bob_unblocked.json()["has_active_transfer"] is False
+
+    # 9. Alice can now successfully send file 2 to Bob!
+    up_2_success = client.post("/api/v1/transfers/upload", headers=alice_headers, json=payload_2)
+    assert up_2_success.status_code == 201
+    transfer_id_2 = up_2_success.json()["transfer_id"]
+
+    # 10. Bob sees the new file in inbox
+    bob_pending = client.get("/api/v1/transfers/pending", headers=bob_headers)
+    assert bob_pending.status_code == 200
+    assert len(bob_pending.json()["transfers"]) == 1
+    assert bob_pending.json()["transfers"][0]["transfer_id"] == transfer_id_2
+
+
 def test_admin_endpoints_and_activity_pdf_generation():
     """Verify admin authorization, user list, activity logs, and PDF generation."""
     # 1. Non-admin forbidden
