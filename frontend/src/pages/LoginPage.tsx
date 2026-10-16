@@ -68,6 +68,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       } else if (res.session_token) {
         setAuthToken(res.session_token)
         const loggedUsername = res.username || usernameOrEmail.trim()
+        localStorage.setItem('sfs_username', loggedUsername)
+        localStorage.setItem('sfs_is_admin', String(!!res.is_admin))
+        if (res.last_login_at) {
+          localStorage.setItem('sfs_last_login', res.last_login_at)
+        }
         onLoginSuccess(loggedUsername, !!res.is_admin, res.last_login_at)
         navigate('/upload')
       }
@@ -101,6 +106,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       if (res.session_token) {
         setAuthToken(res.session_token)
         const loggedUsername = res.username || usernameOrEmail.trim()
+        localStorage.setItem('sfs_username', loggedUsername)
+        localStorage.setItem('sfs_is_admin', String(!!res.is_admin))
+        if (res.last_login_at) {
+          localStorage.setItem('sfs_last_login', res.last_login_at)
+        }
         onLoginSuccess(loggedUsername, !!res.is_admin, res.last_login_at)
         navigate('/upload')
       } else {

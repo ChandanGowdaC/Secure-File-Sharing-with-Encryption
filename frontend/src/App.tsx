@@ -147,7 +147,13 @@ const AppContent: React.FC = () => {
     return () => clearInterval(interval)
   }, [currentUser])
 
-  const handleLoginSuccess = (username: string, adminFlag: boolean) => {
+  const handleLoginSuccess = (username: string, adminFlag: boolean, lastLogin?: string | null) => {
+    localStorage.setItem('sfs_username', username)
+    localStorage.setItem('sfs_is_admin', String(adminFlag))
+    if (lastLogin) {
+      localStorage.setItem('sfs_last_login', lastLogin)
+      setLastLoginAt(lastLogin)
+    }
     setCurrentUser(username)
     setIsAdmin(adminFlag)
     getStoredPrivateKey(username).then(key => setHasPrivateKey(!!key)).catch(() => setHasPrivateKey(false))
@@ -228,15 +234,20 @@ const AppContent: React.FC = () => {
       <main id="main-content" className="main-content" style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
         {currentUser && !hasPrivateKey && !isAdmin && (
           <div style={{ maxWidth: '1100px', margin: '1rem auto 0', padding: '0 1rem' }}>
-            <div className="alert alert-info" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>ℹ️</span>
-              <div>
-                <strong>{t('Crypto Key Alert:', 'क्रिप्टो कुंजी चेतावनी:')}</strong>{' '}
-                {t(
-                  "Long-term private key not detected in your browser's IndexedDB. Generate or restore your cryptographic identity on the Register page.",
-                  'आपके ब्राउज़र के IndexedDB में दीर्घकालिक निजी कुंजी नहीं मिली। पंजीकरण पृष्ठ पर अपनी क्रिप्टोग्राफ़िक पहचान उत्पन्न करें या पुनर्स्थापित करें।'
-                )}
+            <div className="alert alert-info" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>ℹ️</span>
+                <div>
+                  <strong>{t('Crypto Key Alert:', 'क्रिप्टो कुंजी चेतावनी:')}</strong>{' '}
+                  {t(
+                    "Long-term private key not detected in your browser's storage. You can restore or regenerate your key in your Inbox Key Vault.",
+                    'आपके ब्राउज़र स्टोरेज में दीर्घकालिक निजी कुंजी नहीं मिली। आप अपने इनबॉक्स कुंजी वॉल्ट में अपनी कुंजी पुनर्स्थापित या उत्पन्न कर सकते हैं।'
+                  )}
+                </div>
               </div>
+              <Link to="/inbox" className="btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', textDecoration: 'none' }}>
+                {t('Open Key Vault', 'कुंजी वॉल्ट खोलें')}
+              </Link>
             </div>
           </div>
         )}

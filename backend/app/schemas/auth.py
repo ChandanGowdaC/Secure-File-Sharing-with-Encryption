@@ -81,3 +81,12 @@ class ChangePasswordRequest(BaseModel):
 
 class ChangePasswordResponse(BaseModel):
     message: str
+
+
+class UpdatePublicKeyRequest(BaseModel):
+    public_key: str = Field(..., description="Base64-encoded DH public key (client-generated)")
+
+
+class UpdatePublicKeyResponse(BaseModel):
+    message: str
+

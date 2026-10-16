@@ -156,6 +156,11 @@ export const api = {
         `/auth/users/public-key?${query}`
       )
     },
+    updatePublicKey: (body: { public_key: string }) =>
+      request<{ message: string }>('/auth/me/public-key', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
   },
   transfers: {
     upload: (body: unknown) =>

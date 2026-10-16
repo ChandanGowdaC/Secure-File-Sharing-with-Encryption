@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import { getStoredPrivateKey } from '../crypto/keystore'
+import { getStoredPrivateKey, storePrivateKey } from '../crypto/keystore'
 import { deriveTransferKey } from '../crypto/hkdf'
 import { decryptFile } from '../crypto/aes-gcm'
+import { generateLongTermKeyPair } from '../crypto/keypair'
 import { useLanguage } from '../context/LanguageContext'
 
 interface PendingTransfer {
@@ -35,6 +36,14 @@ export const InboxPage: React.FC = () => {
   const [activeAction, setActiveAction] = useState<'decrypt' | 'bin' | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
+  // Key Vault & Recovery States
+  const [showKeyModal, setShowKeyModal] = useState<boolean>(false)
+  const [currentStoredKey, setCurrentStoredKey] = useState<string | null>(null)
+  const [importKeyText, setImportKeyText] = useState<string>('')
+  const [keyModalMsg, setKeyModalMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [isKeyActionLoading, setIsKeyActionLoading] = useState<boolean>(false)
+  const [copiedKey, setCopiedKey] = useState<boolean>(false)
+
   const [downloadTracker, setDownloadTracker] = useState<Record<string, DownloadStatus>>(() => {
     try {
       const saved = localStorage.getItem('sfs_download_tracker')
@@ -59,6 +68,27 @@ export const InboxPage: React.FC = () => {
     })
   }
 
+  const refreshLocalKey = async (): Promise<string | null> => {
+    let user = localStorage.getItem('sfs_username') || ''
+    if (!user) {
+      try {
+        const me = await api.auth.me()
+        if (me && me.username) {
+          user = me.username
+          localStorage.setItem('sfs_username', me.username)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    let key = await getStoredPrivateKey(user)
+    if (!key) {
+      key = await getStoredPrivateKey()
+    }
+    setCurrentStoredKey(key)
+    return key
+  }
+
   const fetchPending = async () => {
     setLoading(true)
     setError(null)
@@ -74,6 +104,7 @@ export const InboxPage: React.FC = () => {
 
   useEffect(() => {
     fetchPending()
+    refreshLocalKey()
   }, [])
 
   const triggerDownload = (blob: Blob, filename: string) => {
@@ -98,14 +129,14 @@ export const InboxPage: React.FC = () => {
     try {
       const payload = await api.transfers.deliver(transferId)
 
-      setStatusMsg(t('Step 2/4: Retrieving long-term private key from IndexedDB...', 'चरण 2/4: IndexedDB से दीर्घकालिक निजी कुंजी प्राप्त की जा रही है...'))
-      const currentUser = localStorage.getItem('sfs_username') || ''
-      const receiverPrivateKey = await getStoredPrivateKey(currentUser)
+      setStatusMsg(t('Step 2/4: Retrieving long-term private key from browser vault...', 'चरण 2/4: ब्राउज़र वॉल्ट से दीर्घकालिक निजी कुंजी प्राप्त की जा रही है...'))
+      const receiverPrivateKey = await refreshLocalKey()
       if (!receiverPrivateKey) {
+        setShowKeyModal(true)
         throw new Error(
           t(
-            'Long-term private key missing from IndexedDB! Please restore key on Register page.',
-            'IndexedDB में दीर्घकालिक निजी कुंजी नहीं मिली! कृपया पंजीकरण पृष्ठ पर कुंजी पुनर्स्थापित करें।'
+            'Long-term private key missing from this browser! The Key Vault modal has opened so you can restore your backup key or regenerate a new keypair.',
+            'इस ब्राउज़र में दीर्घकालिक निजी कुंजी नहीं मिली! कुंजी वॉल्ट मोडल खुल गया है ताकि आप अपनी बैकअप कुंजी पुनर्स्थापित कर सकें या नया कीपेयर बना सकें।'
           )
         )
       }
@@ -188,6 +219,90 @@ export const InboxPage: React.FC = () => {
     }
   }
 
+  const handleCopyKey = () => {
+    if (!currentStoredKey) return
+    navigator.clipboard.writeText(currentStoredKey)
+    setCopiedKey(true)
+    setTimeout(() => setCopiedKey(false), 2500)
+  }
+
+  const handleDownloadKeyBackup = () => {
+    if (!currentStoredKey) return
+    const user = localStorage.getItem('sfs_username') || 'user'
+    const blob = new Blob([currentStoredKey], { type: 'application/json' })
+    triggerDownload(blob, `${user}_private_key_backup.json`)
+  }
+
+  const handleImportKey = async () => {
+    setKeyModalMsg(null)
+    const trimmed = importKeyText.trim()
+    if (!trimmed) {
+      setKeyModalMsg({
+        type: 'error',
+        text: t('Please paste a valid JSON private key JWK string.', 'कृपया एक मान्य JSON निजी कुंजी JWK स्ट्रिंग पेस्ट करें।'),
+      })
+      return
+    }
+
+    try {
+      JSON.parse(trimmed)
+    } catch {
+      setKeyModalMsg({
+        type: 'error',
+        text: t('Invalid format! The private key must be a valid JSON/JWK string.', 'अमान्य प्रारूप! निजी कुंजी एक मान्य JSON/JWK स्ट्रिंग होनी चाहिए।'),
+      })
+      return
+    }
+
+    setIsKeyActionLoading(true)
+    try {
+      const user = localStorage.getItem('sfs_username') || ''
+      await storePrivateKey(user, trimmed)
+      await refreshLocalKey()
+      setImportKeyText('')
+      setKeyModalMsg({
+        type: 'success',
+        text: t('Private key restored and saved to browser vault successfully! You can now decrypt incoming transfers.', 'निजी कुंजी सफलतापूर्वक पुनर्स्थापित और ब्राउज़र वॉल्ट में सहेजी गई! अब आप आने वाले स्थानांतरणों को डिक्रिप्ट कर सकते हैं।'),
+      })
+    } catch (err: any) {
+      setKeyModalMsg({
+        type: 'error',
+        text: err.message || t('Failed to save private key.', 'निजी कुंजी सहेजने में विफल।'),
+      })
+    } finally {
+      setIsKeyActionLoading(false)
+    }
+  }
+
+  const handleRegenerateKeyPair = async () => {
+    const confirmMsg = t(
+      '⚠️ Regenerate Cryptographic Identity?\n\nThis will generate a brand new ECDH keypair and update your public key on the server.\n\nNote: Transfers already encrypted with your previous key will not be decryptable with the new key.',
+      '⚠️ क्रिप्टोग्राफ़िक पहचान पुनः उत्पन्न करें?\n\nयह एक नया ECDH कुंजी युग्म उत्पन्न करेगा और सर्वर पर आपकी सार्वजनिक कुंजी को अद्यतन करेगा।\n\nनोट: आपकी पिछली कुंजी से पहले से एन्क्रिप्ट किए गए स्थानांतरण नई कुंजी से डिक्रिप्ट नहीं किए जा सकेंगे।'
+    )
+    if (!window.confirm(confirmMsg)) return
+
+    setIsKeyActionLoading(true)
+    setKeyModalMsg(null)
+    try {
+      const user = localStorage.getItem('sfs_username') || ''
+      const keypair = await generateLongTermKeyPair()
+      await storePrivateKey(user, keypair.privateKey)
+      await api.auth.updatePublicKey({ public_key: keypair.publicKey })
+      await refreshLocalKey()
+      setKeyModalMsg({
+        type: 'success',
+        text: t('New cryptographic keypair generated and public key synced with server! You are ready to receive and decrypt new files.', 'नया क्रिप्टोग्राफ़िक कुंजी युग्म उत्पन्न किया गया और सार्वजनिक कुंजी सर्वर के साथ समन्वयित की गई! आप नई फ़ाइलें प्राप्त और डिक्रिप्ट करने के लिए तैयार हैं।'),
+      })
+    } catch (err: any) {
+      setKeyModalMsg({
+        type: 'error',
+        text: err.message || t('Failed to regenerate keypair or sync with server.', 'कुंजी युग्म पुनः उत्पन्न करने या सर्वर के साथ समन्वयित करने में विफल।'),
+      })
+    } finally {
+      setIsKeyActionLoading(false)
+    }
+  }
+
   const handleRemoveTransfer = async (transferId: string) => {
     const confirmMsg = t(
       'Are you sure you want to remove this transfer? The encrypted file will be permanently purged from the server.',
@@ -241,17 +356,77 @@ export const InboxPage: React.FC = () => {
               )}
             </p>
           </div>
-          <button
-            onClick={fetchPending}
-            className="btn-secondary"
-            style={{ padding: '0.5rem 1rem', background: '#FFFFFF', border: '1px solid #C6C6C6', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#150202' }}
-          >
-            {t('↻ Refresh Inbox', '↻ इनबॉक्स रीफ्रेश करें')}
-          </button>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                setKeyModalMsg(null)
+                setShowKeyModal(true)
+                refreshLocalKey()
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '0.5rem 1rem',
+                background: currentStoredKey ? '#F8FAFC' : '#FFF3CD',
+                border: currentStoredKey ? '1px solid #C6C6C6' : '1px solid #FFE69C',
+                borderRadius: '6px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: currentStoredKey ? '#150202' : '#664D03',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+              title={t('Manage hardware-stored ECDH private keys and backups', 'हार्डवेयर-संग्रहीत ECDH निजी कुंजियों और बैकअप का प्रबंधन करें')}
+            >
+              <span>🔑</span>
+              {currentStoredKey ? t('Key Vault & Backup', 'कुंजी वॉल्ट एवं बैकअप') : t('⚠️ Restore Private Key', '⚠️ निजी कुंजी पुनर्स्थापित करें')}
+            </button>
+
+            <button
+              onClick={fetchPending}
+              className="btn-secondary"
+              style={{ padding: '0.5rem 1rem', background: '#FFFFFF', border: '1px solid #C6C6C6', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#150202' }}
+            >
+              {t('↻ Refresh Inbox', '↻ इनबॉक्स रीफ्रेश करें')}
+            </button>
+          </div>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
         {statusMsg && <div className="alert alert-success">{statusMsg}</div>}
+
+        {!currentStoredKey && (
+          <div
+            className="alert alert-warning"
+            style={{
+              marginBottom: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+            }}
+          >
+            <div>
+              <strong>{t('⚠️ Private Key Missing from this Browser:', '⚠️ इस ब्राउज़र में निजी कुंजी नहीं मिली:')}</strong>{' '}
+              {t(
+                'Transfers cannot be decrypted without your local private key. If you switched browsers or cleared site data, restore your backup key or regenerate a new keypair.',
+                'आपकी स्थानीय निजी कुंजी के बिना स्थानांतरणों को डिक्रिप्ट नहीं किया जा सकता। यदि आपने ब्राउज़र बदला है या साइट डेटा साफ़ किया है, तो अपनी बैकअप कुंजी पुनर्स्थापित करें या नया कुंजी युग्म बनाएं।'
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setKeyModalMsg(null)
+                setShowKeyModal(true)
+                refreshLocalKey()
+              }}
+              className="btn-primary"
+              style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', backgroundColor: '#214AAB' }}
+            >
+              {t('Open Key Vault', 'कुंजी वॉल्ट खोलें')}
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="empty-state">{t('Loading pending encrypted transfers...', 'लंबित एन्क्रिप्टेड स्थानांतरण लोड हो रहे हैं...')}</div>
@@ -288,7 +463,7 @@ export const InboxPage: React.FC = () => {
                       {/* Right-aligned numbers */}
                       <td style={{ textAlign: 'right', padding: '0.85rem 1rem' }}>
                         <span style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', color: '#150202', padding: '3px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
-                          {formatFileSize(item.file_size_bytes)}
+                          {formatFileSize(item.file_size_bytes || 0)}
                         </span>
                       </td>
                       {/* Status */}
@@ -356,6 +531,214 @@ export const InboxPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Key Vault Modal */}
+      {showKeyModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(21, 2, 2, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100000,
+            padding: '1rem',
+          }}
+          onClick={() => setShowKeyModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              border: '2px solid #EBEAEA',
+              borderRadius: '12px',
+              maxWidth: '680px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '1.75rem',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span style={{ fontSize: '1.5rem' }}>🔑</span>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#162F6A' }}>
+                    {t('Cryptographic Key Vault', 'क्रिप्टोग्राफ़िक कुंजी वॉल्ट')}
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#606060' }}>
+                    {t('Zero-Knowledge Client Storage (IndexedDB & Local Hardware Vault)', 'ज़ीरो-नॉलेज क्लाइंट स्टोरेज (IndexedDB एवं स्थानीय हार्डवेयर वॉल्ट)')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKeyModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.4rem',
+                  cursor: 'pointer',
+                  color: '#606060',
+                  padding: '4px',
+                }}
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            {keyModalMsg && (
+              <div className={`alert alert-${keyModalMsg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: '1rem' }}>
+                {keyModalMsg.text}
+              </div>
+            )}
+
+            {/* Key Status Pill */}
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: currentStoredKey ? '#E6F4EA' : '#FFF3CD',
+                border: currentStoredKey ? '1px solid #198754' : '1px solid #FFE69C',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>{currentStoredKey ? '🔒' : '⚠️'}</span>
+                <div>
+                  <strong style={{ color: currentStoredKey ? '#198754' : '#664D03', fontSize: '0.88rem' }}>
+                    {currentStoredKey ? t('Private Key Stored & Active in this Browser', 'इस ब्राउज़र में निजी कुंजी संग्रहीत एवं सक्रिय है') : t('No Private Key Detected in this Browser', 'इस ब्राउज़र में कोई निजी कुंजी नहीं मिली')}
+                  </strong>
+                  <div style={{ fontSize: '0.78rem', color: currentStoredKey ? '#0f5132' : '#664D03' }}>
+                    {currentStoredKey
+                      ? t('Ready to decrypt incoming files sent to your account.', 'आपके खाते में भेजी गई आने वाली फ़ाइलों को डिक्रिप्ट करने के लिए तैयार।')
+                      : t('Transfers cannot be decrypted without restoring or generating keys.', 'कुंजी पुनर्स्थापित या उत्पन्न किए बिना स्थानांतरण डिक्रिप्ट नहीं हो सकते।')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 1: Backup Private Key (Export) */}
+            {currentStoredKey && (
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #EBEAEA', borderRadius: '8px', background: '#F8FAFC' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.5rem', color: '#162F6A' }}>
+                  {t('1. Backup / Export Active Private Key', '1. सक्रिय निजी कुंजी का बैकअप / निर्यात')}
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: '#606060', margin: '0 0 0.75rem', lineHeight: 1.4 }}>
+                  {t('Copy or download your private key JWK so you can decrypt files on another browser or device.', 'अपनी निजी कुंजी JWK कॉपी या डाउनलोड करें ताकि आप अन्य ब्राउज़र पर फ़ाइलों को डिक्रिप्ट कर सकें।')}
+                </p>
+                <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+                  <textarea
+                    readOnly
+                    value={currentStoredKey}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      fontFamily: 'monospace',
+                      fontSize: '0.75rem',
+                      padding: '0.5rem',
+                      background: '#FFFFFF',
+                      border: '1px solid #C6C6C6',
+                      borderRadius: '4px',
+                      color: '#150202',
+                      resize: 'none',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={handleCopyKey}
+                    className="btn-secondary"
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
+                  >
+                    {copiedKey ? t('✓ Copied to Clipboard!', '✓ क्लिपबोर्ड पर कॉपी हुआ!') : t('📋 Copy Key to Clipboard', '📋 कुंजी क्लिपबोर्ड पर कॉपी करें')}
+                  </button>
+                  <button
+                    onClick={handleDownloadKeyBackup}
+                    className="btn-secondary"
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
+                  >
+                    {t('⬇️ Download Key File (.json)', '⬇️ कुंजी फ़ाइल डाउनलोड करें (.json)')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Section 2: Restore from Backup */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #EBEAEA', borderRadius: '8px', background: '#FFFFFF' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.5rem', color: '#162F6A' }}>
+                {t('2. Restore Private Key from Backup', '2. बैकअप से निजी कुंजी पुनर्स्थापित करें')}
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#606060', margin: '0 0 0.75rem', lineHeight: 1.4 }}>
+                {t('Paste your backed-up private key JWK JSON to restore decryption capabilities on this browser.', 'इस ब्राउज़र पर डिक्रिप्शन क्षमताएं पुनर्स्थापित करने के लिए अपनी बैकअप निजी कुंजी JWK JSON पेस्ट करें।')}
+              </p>
+              <textarea
+                placeholder={t('Paste JSON private key JWK here... (e.g. {"kty":"EC", ...})', 'यहाँ JSON निजी कुंजी JWK पेस्ट करें...')}
+                value={importKeyText}
+                onChange={e => setImportKeyText(e.target.value)}
+                rows={3}
+                style={{
+                  width: '100%',
+                  fontFamily: 'monospace',
+                  fontSize: '0.78rem',
+                  padding: '0.5rem',
+                  background: '#FFFFFF',
+                  border: '1px solid #C6C6C6',
+                  borderRadius: '4px',
+                  color: '#150202',
+                  marginBottom: '0.65rem',
+                }}
+              />
+              <button
+                onClick={handleImportKey}
+                disabled={isKeyActionLoading || !importKeyText.trim()}
+                className="btn-primary"
+                style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', backgroundColor: '#214AAB' }}
+              >
+                {isKeyActionLoading ? t('Saving...', 'सहेजा जा रहा है...') : t('📥 Restore & Save to Browser Vault', '📥 पुनर्स्थापित करें एवं ब्राउज़र वॉल्ट में सहेजें')}
+              </button>
+            </div>
+
+            {/* Section 3: Regenerate Keypair & Sync */}
+            <div style={{ padding: '1rem', border: '1px solid #EBEAEA', borderRadius: '8px', background: '#FFF8F8' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.5rem', color: '#842029' }}>
+                {t('3. Regenerate Keypair & Sync to Server', '3. कुंजी युग्म पुनः उत्पन्न करें एवं सर्वर पर सिंक करें')}
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#606060', margin: '0 0 0.75rem', lineHeight: 1.4 }}>
+                {t(
+                  'If you lost your private key and have no backup, generate a fresh cryptographic identity. Your new public key will be registered with the server immediately.',
+                  'यदि आपकी निजी कुंजी खो गई है और कोई बैकअप नहीं है, तो एक नई क्रिप्टोग्राफ़िक पहचान बनाएं। आपकी नई सार्वजनिक कुंजी तुरंत सर्वर पर पंजीकृत की जाएगी।'
+                )}
+              </p>
+              <button
+                onClick={handleRegenerateKeyPair}
+                disabled={isKeyActionLoading}
+                className="btn-danger"
+                style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', background: '#FFFFFF', border: '1px solid #DC3545', color: '#DC3545' }}
+              >
+                {isKeyActionLoading ? t('Generating & Syncing...', 'उत्पन्न और सिंक हो रहा है...') : t('🔄 Generate New Keypair & Sync Public Key', '🔄 नया कुंजी युग्म बनाएं एवं सार्वजनिक कुंजी सिंक करें')}
+              </button>
+            </div>
+
+            <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
+              <button
+                onClick={() => setShowKeyModal(false)}
+                className="btn-secondary"
+                style={{ padding: '0.45rem 1.25rem', fontSize: '0.85rem', background: '#FFFFFF', border: '1px solid #C6C6C6' }}
+              >
+                {t('Close Vault', 'वॉल्ट बंद करें')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

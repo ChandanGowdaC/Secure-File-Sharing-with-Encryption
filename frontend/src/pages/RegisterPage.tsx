@@ -78,8 +78,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = () => {
       // 1. Generate client-side DH long-term keypair (underlying Web Crypto algorithm unchanged)
       const keypair = await generateLongTermKeyPair()
 
-      // 2. Store private key safely in browser IndexedDB (never sent to server)
+      // 2. Store private key safely in browser IndexedDB and localStorage (never sent to server)
       await storePrivateKey(username, keypair.privateKey)
+      localStorage.setItem('sfs_username', username)
+      localStorage.setItem('sfs_current_private_key', keypair.privateKey)
 
       // 3. Register with backend
       await api.auth.register({

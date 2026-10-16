@@ -21,6 +21,8 @@ from app.schemas.auth import (
     RegisterResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
+    UpdatePublicKeyRequest,
+    UpdatePublicKeyResponse,
     UserMeResponse,
 )
 from app.services.auth import (
@@ -137,3 +139,18 @@ def change_password_api(
     db: Session = Depends(get_db),
 ):
     return change_password_service(db, current_user, payload)
+
+
+@router.put("/me/public-key", response_model=UpdatePublicKeyResponse)
+def update_public_key(
+    payload: UpdatePublicKeyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UpdatePublicKeyResponse:
+    """Update authenticated user's long-term public key on device recovery or key regeneration."""
+    current_user.long_term_public_key = payload.public_key
+    db.commit()
+    from app.services.audit import log_activity
+    log_activity(db, current_user.id, current_user.username, "update_public_key", details="User updated cryptographic public key")
+    return UpdatePublicKeyResponse(message="Public key updated successfully.")
+
