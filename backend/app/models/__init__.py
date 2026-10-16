@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -60,6 +60,8 @@ class Transfer(Base):
     sender_ephemeral_public_key: Mapped[str] = mapped_column(Text)
     original_filename: Mapped[str | None] = mapped_column(String(512), nullable=True)
     file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    encryption_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    decryption_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

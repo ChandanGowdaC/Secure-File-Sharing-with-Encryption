@@ -13,6 +13,8 @@ interface PendingTransfer {
   receiver: string
   status: string
   file_size_bytes?: number | null
+  encryption_time_ms?: number | null
+  decryption_time_ms?: number | null
 }
 
 function formatFileSize(bytes: number) {
@@ -24,6 +26,7 @@ function formatFileSize(bytes: number) {
 interface DownloadStatus {
   decrypted?: boolean
   encrypted?: boolean
+  decryptionTimeMs?: number | null
 }
 
 export const InboxPage: React.FC = () => {
@@ -142,6 +145,8 @@ export const InboxPage: React.FC = () => {
       }
 
       setStatusMsg(t('Step 3/4: Deriving 256-bit transfer key with HKDF-SHA256...', 'चरण 3/4: HKDF-SHA256 के साथ 256-बिट स्थानांतरण कुंजी व्युत्पन्न की जा रही है...'))
+      // Measure client-side cryptographic decryption and tag verification duration
+      const t0 = performance.now()
       const transferKey = await deriveTransferKey(receiverPrivateKey, payload.sender_ephemeral_public_key)
 
       setStatusMsg(t('Step 4/4: Decrypting ciphertext & verifying AES-256-GCM auth tag...', 'चरण 4/4: सिफ़रटेक्स्ट डिक्रिप्ट करना और AES-256-GCM ऑथ टैग सत्यापित करना...'))
@@ -153,16 +158,28 @@ export const InboxPage: React.FC = () => {
         },
         transferKey
       )
+      const t1 = performance.now()
+      const decDurationMs = Math.round((t1 - t0) * 100) / 100
 
       const filename = payload.original_filename || `decrypted_${transferId.slice(0, 8)}.txt`
       triggerDownload(new Blob([decryptedBuffer]), filename)
 
-      await api.transfers.downloadAck(transferId, { success: true })
-      updateDownloadTracker(transferId, { decrypted: true })
+      await api.transfers.downloadAck(transferId, {
+        success: true,
+        decryption_time_ms: decDurationMs,
+      })
+      updateDownloadTracker(transferId, { decrypted: true, decryptionTimeMs: decDurationMs })
+      setPendingTransfers(prev =>
+        prev.map(item =>
+          item.transfer_id === transferId
+            ? { ...item, decryption_time_ms: decDurationMs }
+            : item
+        )
+      )
       setStatusMsg(
         t(
-          `Decryption successful! "${filename}" downloaded. The transfer is retained in your inbox so you can also download the raw encrypted file, or click Remove when done.`,
-          `डिक्रिप्शन सफल! "${filename}" डाउनलोड हो गई। स्थानांतरण आपके इनबॉक्स में सुरक्षित है ताकि आप रॉ एन्क्रिप्टेड फ़ाइल भी डाउनलोड कर सकें, या पूरा होने पर हटाएं क्लिक करें।`
+          `Decryption successful in ${decDurationMs} ms! "${filename}" downloaded. The transfer is retained in your inbox so you can also download the raw encrypted file, or click Remove when done.`,
+          `${decDurationMs} ms में डिक्रिप्शन सफल! "${filename}" डाउनलोड हो गई। स्थानांतरण आपके इनबॉक्स में सुरक्षित है ताकि आप रॉ एन्क्रिप्टेड फ़ाइल भी डाउनलोड कर सकें, या पूरा होने पर हटाएं क्लिक करें।`
         )
       )
     } catch (err: any) {
@@ -428,6 +445,32 @@ export const InboxPage: React.FC = () => {
           </div>
         )}
 
+        {/* Performance Benchmarking Explanation */}
+        <div
+          style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
+            fontSize: '0.82rem',
+            color: '#475569',
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#162F6A', marginBottom: '4px' }}>
+            <span>⏱️</span>
+            <span>{t('Client-Side Cryptographic Timing (Enc / Dec)', 'क्लाइंट-साइड क्रिप्टोग्राफ़िक समय (एन्क्र / डिक्र)')}</span>
+          </div>
+          <div>
+            <strong>{t('What is measured?', 'क्या मापा जाता है?')}</strong>{' '}
+            {t(
+              'High-resolution client-side browser timers (performance.now()) measure pure cryptographic execution: 🔒 Enc is sender duration (HKDF key derivation + AES-256-GCM authenticated cipher encryption). ⚡ Dec is receiver duration (HKDF session key derivation + AES-256-GCM deciphering and 128-bit authentication tag verification). Network latency and disk I/O are completely excluded.',
+              'उच्च-रिज़ॉल्यूशन क्लाइंट-साइड ब्राउज़र टाइमर (performance.now()) शुद्ध क्रिप्टोग्राफ़िक निष्पादन को मापते हैं: 🔒 एन्क्र प्रेषक अवधि है (HKDF कुंजी व्युत्पत्ति + AES-256-GCM प्रमाणीकृत सिफ़र एन्क्रिप्शन)। ⚡ डिक्र प्राप्तकर्ता अवधि है (HKDF सत्र कुंजी व्युत्पत्ति + AES-256-GCM डिक्रिप्शन और 128-बिट प्रमाणीकरण टैग सत्यापन)। नेटवर्क विलंबता और डिस्क I/O पूरी तरह से बाहर हैं।'
+            )}
+          </div>
+        </div>
+
         {loading ? (
           <div className="empty-state">{t('Loading pending encrypted transfers...', 'लंबित एन्क्रिप्टेड स्थानांतरण लोड हो रहे हैं...')}</div>
         ) : pendingTransfers.length === 0 ? (
@@ -440,6 +483,7 @@ export const InboxPage: React.FC = () => {
                   <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>{t('Sender', 'प्रेषक')}</th>
                   <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>{t('Transfer ID', 'स्थानांतरण आईडी')}</th>
                   <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>{t('File Size', 'फ़ाइल आकार')}</th>
+                  <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>{t('Crypto Timing (Enc / Dec)', 'क्रिप्टो समय (एन्क्र / डिक्र)')}</th>
                   <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A' }}>{t('Status', 'स्थिति')}</th>
                   <th style={{ textAlign: 'center', padding: '0.85rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#162F6A', minWidth: '320px' }}>{t('Actions', 'क्रियाएं')}</th>
                 </tr>
@@ -465,6 +509,55 @@ export const InboxPage: React.FC = () => {
                         <span style={{ background: '#F8FAFC', border: '1px solid #EBEAEA', color: '#150202', padding: '3px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
                           {formatFileSize(item.file_size_bytes || 0)}
                         </span>
+                      </td>
+                      {/* Crypto Timing (Enc / Dec) */}
+                      <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>
+                        <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                          <span
+                            style={{
+                              background: item.encryption_time_ms != null ? '#EFF6FF' : '#F1F5F9',
+                              border: item.encryption_time_ms != null ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
+                              color: item.encryption_time_ms != null ? '#1E40AF' : '#64748B',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              fontFamily: 'monospace',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={t(
+                              'Sender browser encryption duration (HKDF-SHA256 + AES-256-GCM)',
+                              'प्रेषक ब्राउज़र एन्क्रिप्शन अवधि (HKDF-SHA256 + AES-256-GCM)'
+                            )}
+                          >
+                            🔒 {t('Enc:', 'एन्क्र:')} {item.encryption_time_ms != null ? `${item.encryption_time_ms} ms` : 'N/A'}
+                          </span>
+                          {(() => {
+                            const decTime = item.decryption_time_ms ?? tracker.decryptionTimeMs
+                            const isDec = tracker.decrypted || decTime != null
+                            return (
+                              <span
+                                style={{
+                                  background: decTime != null ? '#F0FDF4' : isDec ? '#ECFDF5' : '#F8FAFC',
+                                  border: decTime != null ? '1px solid #BBF7D0' : isDec ? '1px solid #A7F3D0' : '1px dashed #CBD5E1',
+                                  color: decTime != null ? '#15803D' : isDec ? '#047857' : '#94A3B8',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  fontFamily: 'monospace',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={t(
+                                  'Receiver browser decryption duration (HKDF-SHA256 + AES-256-GCM tag verification)',
+                                  'प्राप्तकर्ता ब्राउज़र डिक्रिप्शन अवधि (HKDF-SHA256 + AES-256-GCM टैग सत्यापन)'
+                                )}
+                              >
+                                ⚡ {t('Dec:', 'डिक्र:')} {decTime != null ? `${decTime} ms` : isDec ? t('Verified', 'सत्यापित') : t('Pending', 'लंबित')}
+                              </span>
+                            )
+                          })()}
+                        </div>
                       </td>
                       {/* Status */}
                       <td style={{ textAlign: 'center', padding: '0.85rem 1rem' }}>

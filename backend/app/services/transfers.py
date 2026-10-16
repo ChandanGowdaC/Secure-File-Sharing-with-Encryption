@@ -92,6 +92,7 @@ def upload_transfer(
         sender_ephemeral_public_key=payload.sender_ephemeral_public_key,
         original_filename=payload.original_filename,
         file_size_bytes=file_size_bytes,
+        encryption_time_ms=payload.encryption_time_ms,
     )
     db.add(transfer)
     db.commit()
@@ -102,7 +103,8 @@ def upload_transfer(
 
     from app.services.audit import format_file_size, log_activity
     formatted_sz = format_file_size(file_size_bytes)
-    log_activity(db, sender.id, sender.username, "upload_file", details=f"To: {receiver.username}, Size: {formatted_sz}")
+    enc_info = f", Enc Time: {payload.encryption_time_ms} ms" if payload.encryption_time_ms is not None else ""
+    log_activity(db, sender.id, sender.username, "upload_file", details=f"To: {receiver.username}, Size: {formatted_sz}{enc_info}")
 
     return UploadTransferResponse(
         transfer_id=transfer_id,
@@ -130,6 +132,8 @@ def list_pending(db: Session, receiver: User) -> PendingTransfersResponse:
                 receiver=receiver.username,
                 status=TransferStatus(t.status),
                 file_size_bytes=t.file_size_bytes if (t.file_size_bytes is not None and t.file_size_bytes > 0) else 1024,
+                encryption_time_ms=t.encryption_time_ms,
+                decryption_time_ms=t.decryption_time_ms,
             )
             for t in transfers
         ]
@@ -179,6 +183,8 @@ def deliver_transfer(
         sender=transfer.sender.username,
         original_filename=transfer.original_filename,
         file_size_bytes=effective_size,
+        encryption_time_ms=transfer.encryption_time_ms,
+        decryption_time_ms=transfer.decryption_time_ms,
     )
 
     # Note: Blob is retained so receiver can download both decrypted and raw encrypted (.bin) files.
@@ -211,13 +217,21 @@ def list_received(db: Session, receiver: User) -> ReceivedTransfersResponse:
                 original_filename=transfer.original_filename,
                 file_size_bytes=transfer.file_size_bytes or 1024,
                 ciphertext=None,
+                encryption_time_ms=transfer.encryption_time_ms,
+                decryption_time_ms=transfer.decryption_time_ms,
             )
         )
 
     return ReceivedTransfersResponse(transfers=items)
 
 
-def acknowledge_download(db: Session, receiver: User, transfer_id: str, success: bool) -> None:
+def acknowledge_download(
+    db: Session,
+    receiver: User,
+    transfer_id: str,
+    success: bool,
+    decryption_time_ms: float | None = None,
+) -> None:
     transfer = (
         db.query(Transfer)
         .filter(Transfer.transfer_id == transfer_id, Transfer.receiver_id == receiver.id)
@@ -230,17 +244,26 @@ def acknowledge_download(db: Session, receiver: User, transfer_id: str, success:
         log_event(db, transfer, "download_failed", details="Client reported decryption failure")
         raise AppError("Decryption or integrity verification failed.", status_code=400)
 
+    if decryption_time_ms is not None:
+        transfer.decryption_time_ms = decryption_time_ms
+
     # Keep status as delivered so user can download both decrypted and raw encrypted (.bin) before removing
     if transfer.status == TransferStatus.pending.value:
         transfer.status = TransferStatus.delivered.value
     db.commit()
-    log_event(db, transfer, "downloaded")
+    log_event(
+        db,
+        transfer,
+        "downloaded",
+        details=f"Decryption time: {decryption_time_ms} ms" if decryption_time_ms is not None else None,
+    )
 
     from app.services.audit import format_file_size, log_activity
     formatted_sz = format_file_size(transfer.file_size_bytes) if transfer.file_size_bytes else None
     size_detail = f", Size: {formatted_sz}" if formatted_sz and formatted_sz != "-" else ""
+    dec_detail = f", Dec Time: {decryption_time_ms} ms" if decryption_time_ms is not None else ""
     sender_name = transfer.sender.username if transfer.sender else "user"
-    log_activity(db, receiver.id, receiver.username, "download_file", details=f"From: {sender_name}{size_detail}")
+    log_activity(db, receiver.id, receiver.username, "download_file", details=f"From: {sender_name}{size_detail}{dec_detail}")
 
 
 def delete_transfer(

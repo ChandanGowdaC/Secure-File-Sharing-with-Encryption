@@ -18,6 +18,7 @@ class UploadTransferRequest(BaseModel):
     sender_ephemeral_public_key: str = Field(..., description="Base64-encoded ephemeral DH public key")
     original_filename: Optional[str] = None
     file_size_bytes: Optional[int] = Field(default=None, ge=0, description="Original plaintext file size in bytes")
+    encryption_time_ms: Optional[float] = Field(default=None, ge=0, description="Measured client-side encryption duration in ms")
 
 
 class UploadTransferResponse(BaseModel):
@@ -32,6 +33,8 @@ class TransferSummary(BaseModel):
     receiver: str
     status: TransferStatus
     file_size_bytes: Optional[int] = None
+    encryption_time_ms: Optional[float] = None
+    decryption_time_ms: Optional[float] = None
 
 
 class PendingTransfersResponse(BaseModel):
@@ -47,6 +50,8 @@ class DeliverTransferResponse(BaseModel):
     sender: str
     original_filename: Optional[str] = None
     file_size_bytes: Optional[int] = None
+    encryption_time_ms: Optional[float] = None
+    decryption_time_ms: Optional[float] = None
 
 
 class ReceivedTransferItem(BaseModel):
@@ -59,6 +64,8 @@ class ReceivedTransferItem(BaseModel):
     sender_ephemeral_public_key: Optional[str] = None
     original_filename: Optional[str] = None
     file_size_bytes: Optional[int] = None
+    encryption_time_ms: Optional[float] = None
+    decryption_time_ms: Optional[float] = None
 
 
 
@@ -68,3 +75,4 @@ class ReceivedTransfersResponse(BaseModel):
 
 class DownloadAckRequest(BaseModel):
     success: bool = True
+    decryption_time_ms: Optional[float] = Field(default=None, ge=0, description="Measured client-side decryption duration in ms")

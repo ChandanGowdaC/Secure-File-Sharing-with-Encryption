@@ -28,6 +28,11 @@ export const UploadPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [lastTiming, setLastTiming] = useState<{
+    encryptionTimeMs: number
+    filename: string
+    fileSize: number
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateAndSetFile = (selectedFile: File) => {
@@ -120,12 +125,6 @@ export const UploadPage: React.FC = () => {
       // 2. Generate ephemeral key pair
       const ephemeralKeypair = await generateEphemeralKeyPair()
 
-      // 3. Derive 256-bit AES key via HKDF
-      const transferKey = await deriveTransferKey(
-        ephemeralKeypair.privateKey,
-        keyRes.public_key
-      )
-
       setStatusMsg(
         t(
           'Step 3/4: Encrypting file locally with AES-256-GCM...',
@@ -133,7 +132,17 @@ export const UploadPage: React.FC = () => {
         )
       )
       const arrayBuffer = await file.arrayBuffer()
+
+      // Measure client-side cryptographic encryption duration
+      // (HKDF-SHA256 session key derivation + AES-256-GCM authenticated encryption)
+      const t0 = performance.now()
+      const transferKey = await deriveTransferKey(
+        ephemeralKeypair.privateKey,
+        keyRes.public_key
+      )
       const { ciphertext, nonce, authTag } = await encryptFile(arrayBuffer, transferKey)
+      const t1 = performance.now()
+      const encryptionDurationMs = Math.round((t1 - t0) * 100) / 100
 
       setStatusMsg(
         t(
@@ -141,20 +150,30 @@ export const UploadPage: React.FC = () => {
           'चरण 4/4: सिफ़रटेक्स्ट ब्लॉब सुरक्षित कतार में अपलोड किया जा रहा है...'
         )
       )
+      const currentFileName = file.name
+      const currentFileSize = file.size
+
       const uploadRes = await api.transfers.upload({
         receiver_username: receiverUsername.trim(),
         ciphertext,
         nonce,
         auth_tag: authTag,
         sender_ephemeral_public_key: ephemeralKeypair.publicKey,
-        original_filename: file.name,
-        file_size_bytes: file.size,
+        original_filename: currentFileName,
+        file_size_bytes: currentFileSize,
+        encryption_time_ms: encryptionDurationMs,
+      })
+
+      setLastTiming({
+        encryptionTimeMs: encryptionDurationMs,
+        filename: currentFileName,
+        fileSize: currentFileSize,
       })
 
       setStatusMsg(
         t(
-          `Success! Encrypted file "${file.name}" queued for recipient. Transfer ID: ${uploadRes.transfer_id}`,
-          `सफलता! एन्क्रिप्टेड फ़ाइल "${file.name}" प्राप्तकर्ता के लिए कतारबद्ध है। स्थानांतरण आईडी: ${uploadRes.transfer_id}`
+          `Success! Encrypted file "${currentFileName}" queued for recipient. Transfer ID: ${uploadRes.transfer_id}`,
+          `सफलता! एन्क्रिप्टेड फ़ाइल "${currentFileName}" प्राप्तकर्ता के लिए कतारबद्ध है। स्थानांतरण आईडी: ${uploadRes.transfer_id}`
         )
       )
       setFile(null)
@@ -226,6 +245,50 @@ export const UploadPage: React.FC = () => {
         {statusMsg && !error && (
           <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
             <span>{statusMsg}</span>
+          </div>
+        )}
+
+        {lastTiming && !error && (
+          <div
+            style={{
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: '8px',
+              padding: '0.9rem 1.1rem',
+              marginBottom: '1.25rem',
+              color: '#166534',
+              fontSize: '0.85rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                <span>⚡</span>
+                <span>{t('Client-Side Encryption Benchmark', 'क्लाइंट-साइड एन्क्रिप्शन बेंचमार्क')}:</span>
+                <span
+                  style={{
+                    background: '#DCFCE7',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #86EFAC',
+                    color: '#15803D',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                  }}
+                >
+                  {lastTiming.encryptionTimeMs} ms
+                </span>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: '#15803D' }}>
+                {lastTiming.filename} ({formatFileSize(lastTiming.fileSize)})
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803D', lineHeight: 1.45 }}>
+              <strong>{t('Exact measurement:', 'सटीक माप:')}</strong>{' '}
+              {t(
+                'High-resolution performance.now() timer measuring client-side HKDF-SHA256 session key derivation + AES-256-GCM symmetric block encryption and 128-bit authentication tag calculation. Excludes local file selection disk I/O and server upload latency.',
+                'उच्च-रिज़ॉल्यूशन performance.now() टाइमर क्लाइंट-साइड HKDF-SHA256 सत्र कुंजी व्युत्पत्ति + AES-256-GCM सममित ब्लॉक एन्क्रिप्शन और 128-बिट प्रमाणीकरण टैग गणना को मापता है। स्थानीय फ़ाइल चयन डिस्क I/O और सर्वर अपलोड विलंबता को बाहर करता है।'
+              )}
+            </p>
           </div>
         )}
 

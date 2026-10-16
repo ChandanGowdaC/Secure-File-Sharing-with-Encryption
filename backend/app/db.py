@@ -50,6 +50,7 @@ def init_db(reset: bool = False) -> None:
         wipe_all_tables()
     Base.metadata.create_all(bind=engine)
     _ensure_transfer_file_size_column()
+    _ensure_transfer_timing_columns()
     _ensure_user_last_login_column()
     _ensure_activity_logs_table()
     _repair_corrupted_activity_log_details()
@@ -113,6 +114,19 @@ def _ensure_transfer_file_size_column() -> None:
             connection.execute(text("UPDATE transfers SET file_size_bytes = 1024 WHERE file_size_bytes IS NULL"))
     except Exception:
         pass
+
+
+def _ensure_transfer_timing_columns() -> None:
+    inspector = inspect(engine)
+    if "transfers" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("transfers")}
+    column_type = "FLOAT" if db_url.startswith("sqlite") else "REAL"
+    with engine.begin() as connection:
+        if "encryption_time_ms" not in columns:
+            connection.execute(text(f"ALTER TABLE transfers ADD COLUMN encryption_time_ms {column_type}"))
+        if "decryption_time_ms" not in columns:
+            connection.execute(text(f"ALTER TABLE transfers ADD COLUMN decryption_time_ms {column_type}"))
 
 
 def _ensure_user_last_login_column() -> None:

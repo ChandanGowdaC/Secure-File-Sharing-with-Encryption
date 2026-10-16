@@ -176,6 +176,8 @@ export const api = {
           receiver: string
           status: string
           file_size_bytes?: number | null
+          encryption_time_ms?: number | null
+          decryption_time_ms?: number | null
         }>
       }>('/transfers/pending'),
     received: () => request<{ transfers: Array<unknown> }>('/transfers/received'),
@@ -189,6 +191,8 @@ export const api = {
         sender: string
         original_filename?: string
         file_size_bytes?: number | null
+        encryption_time_ms?: number | null
+        decryption_time_ms?: number | null
       }>(`/transfers/${transferId}/deliver`, { method: 'POST' }),
     downloadAck: (transferId: string, body: unknown) =>
       request(`/transfers/${transferId}/download-ack`, { method: 'POST', body: JSON.stringify(body) }),

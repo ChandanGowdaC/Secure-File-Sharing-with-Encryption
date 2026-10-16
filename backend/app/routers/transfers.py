@@ -73,7 +73,13 @@ def acknowledge_download(
     db: Session = Depends(get_db),
 ) -> None:
     """F.13/F.14 – Acknowledge successful download and log metadata event."""
-    acknowledge_download_service(db, receiver=current_user, transfer_id=transfer_id, success=payload.success)
+    acknowledge_download_service(
+        db,
+        receiver=current_user,
+        transfer_id=transfer_id,
+        success=payload.success,
+        decryption_time_ms=payload.decryption_time_ms,
+    )
 
 
 @router.delete("/{transfer_id}", status_code=status.HTTP_204_NO_CONTENT)
